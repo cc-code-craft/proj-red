@@ -3,7 +3,10 @@
 ' - store in a str array
 ' - store len in a num array
 ' - then, parse each line
-
+'   - [label] [opcode] [operand] [comment]
+'   - fields are seperated by at least one space
+'   - if no label then opcode must be preceeded by a space
+'   - the operand must not contain spaces
 
 1 REM       org @32000
 2 REM       ld bc,@32002
@@ -21,38 +24,124 @@
 27 REM --------------------------------------------------------------
 
 30 REM Define GOTO/GOSUB line constants
-32 LET aParseNewLine=105: LET aAddLine=205
+32 LET aParseLines=105: LET aParseNext=130: LET aGetOp=201: LET aGetLabel=231
 34 LET aPass1=255: LET aProcLabel=305: LET aProcLine=335
 36 LET aPass2=405: LET aProcOp=505: LET aGetNum=555: LET aCalcJump=805
 
-40 REM line data, length, count
+40 REM op data, length, count
 41 DIM l$(100,25): DIM l(100): LET lc=0
 
-42 REM label name, length, count, location
+42 REM label name, length, count, position(location)
 43 DIM q$(20,10): DIM q(20): LET qc=0: DIM p(20)
 
 75 REM DEF FN t$(a$)=a$(2 TO ): REM TL$
 80 REM DEF FN m(i$,j$)=(i$=j$( TO LEN (i$))): REM match i$ to start of j$
 
 90 LET codeLoc=(PEEK 23635+(256*PEEK 23636))+5: REM get start location of REM lines
+92 LET token=""
 
-100 REM aParseNewLine
-105 FOR i=1 TO 100
-110    LET ch=PEEK codeLoc
-112    IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO 110: REM remove leading space
-114    IF  ch=13 THEN LET codeLoc=codeLoc+6: GOTO 110: REM remove empty line
-116    IF  ch=36 THEN GOTO aPass1: REM $end$
-120    GOSUB aAddLine
-130 NEXT i
-140 PRINT "error: max lines read with no $end$": STOP
+' aParseLine
+' - check first char for newline => skip, advance
+' - check first char for space => no label, advance
+'   - check for token
+' - get label...
 
-200 REM aAddLine(i,ch,codeLoc) adds line, length to l$, l
-205 LET x$=""
-210 FOR j=1 TO 25
-215    LET x$=x$+CHR$(ch): LET codeLoc=codeLoc+1: LET ch=PEEK codeLoc
-220    IF ch=13 THEN LET lc=lc+1: LET l$(lc)=x$: LET l(lc)=j: LET codeLoc=codeLoc+6: RETURN
-235 NEXT j
-240 PRINT "error: line too long (must be <= 25) "+x$: STOP
+100 REM aParseCode(codeLoc)
+101 FOR i=1 TO 100
+104    LET ch=PEEK codeLoc
+106    IF  ch=13 THEN LET codeLoc=codeLoc+6: GOTO gParseNextLine: REM remove empty line
+108    IF  ch=36 THEN GOTO gPass1: REM $end$
+110    IF  ch=32 THEN GOSUB aGetOp: GOTO gParseNextLine
+112    GOSUB aGetLabel: GOSUB aGetOp: REM ======> Check line count, don't rely on i <=============
+114 NEXT i
+116 PRINT "error: max lines read with no $end$": STOP
+
+
+230 REM aGetLabel(i,ch,codeLoc) adds label, length, location to q$, q, p
+204 GOSUB aGetToken
+206 IF LEN$(token$)>0 THEN LET qc=qc+1: LET q$(qc)=x$: LET q(qc)=j-1: LET p(qc)=lc: RETURN
+220 PRINT "error: line too long "+STR$(i): STOP
+
+'state 0: label
+'state 1: opcode
+'state 3: operand
+'state 4: comment/newline
+
+150 REM aGetToken(codeLoc) updates codeLoc after getting token
+151 GOSUB aStripToken
+154 LET token$=""
+156 FOR k=1 TO 15
+158    LET ch=PEEK codeLoc
+160    IF  ch=32 OR ch=13 THEN RETURN
+162    LET token$=token$+CHR$(ch): LET codeLoc=codeLoc+1    
+164    LET codeLoc=codeLoc+1
+166 NEXT k
+168 PRINT "error: aGetToken - token too long": STOP
+
+
+
+150 REM aGetToken(codeLoc) updates codeLoc after getting token
+151 LET token$="": LET state=0
+154 FOR k=1 TO 15
+156    LET ch=PEEK codeLoc
+158    IF  ch=13 THEN RETURN
+160    IF  ch=32 AND state=1 THEN RETURN
+162    IF  ch=32 AND state=0 THEN skip....
+168    LET token$=token$+CHR$(ch): LET codeLoc=codeLoc+1    
+170    LET codeLoc=codeLoc+1
+
+208    LET ch=PEEK codeLoc
+210    IF  ch=13 THEN LET lc=lc+1: LET l$(lc)=x$: LET l(lc)=j: LET codeLoc=codeLoc+6: RETURN: REM => check line count! <=
+212    IF  ch=32 AND state=1 THEN LET lc=lc+1: LET l$(lc)=x$: LET l(lc)=j: LET codeLoc=codeLoc+6: RETURN: REM check line count!
+214    LET x$=x$+CHR$(ch): LET codeLoc=codeLoc+1
+216    IF  ch=32 AND state=0 THEN LET state=1: GOSUB aStripSpaces
+
+175 NEXT k
+180 PRINT "error: token too long, line "+STR$(i): STOP
+
+
+150 REM aStripToken(codeLoc) advances codeLoc skipping leading spaces
+155 FOR k=1 TO 15
+160    LET ch=PEEK codeLoc
+165    IF  ch<>32 RETURN
+170    LET codeLoc=codeLoc+1
+175 NEXT k
+180 PRINT "error: aStripToken - token too long": STOP
+
+
+
+
+200 REM aGetOp(i,ch,codeLoc) adds line, length to l$, l
+201 GOSUB aStripSpaces
+204 LET x$="": LET state=0
+206 FOR j=1 TO 25
+208    LET ch=PEEK codeLoc
+210    IF  ch=13 THEN LET lc=lc+1: LET l$(lc)=x$: LET l(lc)=j: LET codeLoc=codeLoc+6: RETURN: REM => check line count! <=
+212    IF  ch=32 AND state=1 THEN LET lc=lc+1: LET l$(lc)=x$: LET l(lc)=j: LET codeLoc=codeLoc+6: RETURN: REM check line count!
+214    LET x$=x$+CHR$(ch): LET codeLoc=codeLoc+1
+216    IF  ch=32 AND state=0 THEN LET state=1: GOSUB aStripSpaces
+218 NEXT j
+220 PRINT "error: line too long "+STR$(i): STOP
+
+
+'=========> Start here: [To Do] consider aGetToken, manage line count (don't use i) <====================
+230 REM aGetLabel(i,ch,codeLoc) adds label, length, location to q$, q, p
+204 LET x$=""
+206 FOR j=1 TO 25
+208    LET ch=PEEK codeLoc
+210    IF  ch=13 THEN PRINT "error: no op defined after label "+x$: STOP
+212    IF  ch=32 AND THEN LET qc=qc+1: LET q$(qc)=x$: LET q(qc)=j-1: LET p(qc)=lc: RETURN
+214    LET x$=x$+CHR$(ch): LET codeLoc=codeLoc+1
+218 NEXT j
+220 PRINT "error: line too long "+STR$(i): STOP
+
+
+
+
+231 FOR j=1 to x
+234    IF x$(j)=" " THEN LET qc=qc+1: LET q$(qc)=x$(TO j-1): LET q(qc)=j-1: LET p(qc)=i: GOSUB aProcLine: RETURN
+236 NEXT j
+238 
 
 250 REM aPass1(l$(),l(),lc) create label struct q$(),q(),qc, p(), update line
 255 FOR i=1 TO lc
