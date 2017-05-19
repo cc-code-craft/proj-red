@@ -21,37 +21,77 @@
 
 'Skip "REM ", 4 bytes, strip space (32d), parse tokens and read until end of line => enter (13d)
 
-1 REM    
-2 REM 'comment
-3 REM loop ld a, 5
-4 REM   inc a
+- Simpify parsing to begin with:
+  - no comments
+  - all labels must start with '!'
+  - '@' specifies end of code list
+  - space delimits tokens (no  ,)
+  
+- Parse the following:
+  - [label] op,reg [addr]
+  -         op
+  -         op [label]
+
+- To Do:
+  - Parse line
+  - Save label info if any
+  - Lookup opcode
+  - Save pass 1 line
+
+
+1 REM org 32000
+2 REM       ld bc,@32002
+3 REM !loop ld b,5
+4 REM       inc b
 5 REM
-6 REM @end@ 64 ©end© 127
+6 REM #end#
 
-10 LET t$="": LET tok=1: REM token list, max 4 tokens of len 9
+10 DIM x$(255,10): DIM x(255): REM lookup struct, x$ opcode, x asm val
+11 FOR i=1 TO 8: READ x$(i): NEXT i: REM read into lookup struct
+12 DATA "nop","ld bc,NN","ld (bc),a","inc bc","inc b","dec b","ld b,N","rlca"
 
-20 LET aGetToken = 200: LET aGetTokenRet = 151: REM Define GOTO line constants
+15 REM parse struct: label | assembled op | 1 or 2 byte val
+16 DIM l$(100,10): DIM l(100): DIM p(100): DIM v(100)
+
+20 LET t$="": LET tok=1: REM token list, max 4 tokens of len 9
+
+30 REM Define GOTO line constants
+32 LET aParseLine=100: LET aParseSpace=200: LET aParseEnter=220: LET aParseLabel=240: LET aParseInstr=260: LET aGetToken=1000
 
 50 LET codeLoc = (PEEK 23635 + (256*PEEK 23636)) + 5: REM ??? check offset 5 vs 6 ???
 
 75 DEF FN t$(a$)=a$(2 TO ): REM TL$
 
-99 REM While there is REM data to process
-100 LET ch = PEEK codeLoc
-130 IF  ch = 13 THEN LET codeLoc = codeLoc + 6: LET tok=1: GOTO 100: REM enter, reset token counter
-140 IF  ch = 32 THEN LET codeLoc = codeLoc + 1: GOTO 100: REM space
-145 IF  ch = 64 THEN GOTO 9999: REM end
-150 GOTO aGetToken
-160 PRINT t$: LET t$=""
-170 GOTO 100
+100 REM aParseLine
+110 LET ch=PEEK codeLoc
+120 IF  ch=32 THEN GOTO aParseSpace
+130 IF  ch=13 THEN GOTO aParseEnter
+140 IF  ch=33 THEN GOTO aParseLabel
+150 IF  ch=35 THEN GOTO 9999: REM end
+160 GOTO aParseInstr
+170 PRINT "error: invalid line": STOP
 
+200 REM aParseSpace
+202 LET codeLoc = codeLoc + 1: GOTO aParseLine
 
-199 REM aGetToken
-200 FOR j=1 TO 9
-210   LET t$ = t$+chr$(ch)
-220   LET codeLoc = codeLoc + 1
-225   LET ch = PEEK codeLoc
-230   IF  ch = 32 THEN LET tok=tok+1: GOTO aGetTokenRet
-235   IF  ch = 13 THEN LET tok=tok+1: GOTO aGetTokenRet
-240 NEXT j
-241 PRINT "error: token too long (> len 8)": STOP
+220 REM aParseEnter
+222 LET codeLoc = codeLoc + 6: GOTO aParseLine
+
+240 REM aParseLabel
+242 GOSUB aGetToken
+244 PRINT t$: GOTO aParseLine
+
+260 REM aParseInstr
+262 GOSUB aGetToken
+264 PRINT t$: GOTO aParseLine
+
+1000 REM aGetToken(ch,codeLoc) returns t$,nl
+1002 LET t$="": LET nl=0
+1004 FOR j=1 TO 9
+1006   LET t$ = t$+chr$(ch)
+1008   LET codeLoc = codeLoc + 1
+1010   LET ch = PEEK codeLoc
+1012   IF  ch = 32 THEN RETURN
+1014   IF  ch = 13 THEN LET nl=1: RETURN
+1016 NEXT j
+1018 PRINT "error: token too long (> len 9)": STOP
