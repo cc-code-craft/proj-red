@@ -21,6 +21,15 @@
 
 'Skip "REM ", 4 bytes, strip space (32d), parse tokens and read until end of line => enter (13d)
 
+' DIM b(9): LET b(1)=1: FOR i=2 TO 9: LET b(i)=b(i-1)+b(i-1): NEXT i
+' REM b() set to 1,2,4,8,16,32,64,128,256
+' DEF FN c(x,i)=INT (x/b(i+1))-INT (x/b(i+2))*2
+' DEF FN x(x,i)=x-b(i+2)*FN b(x,i)+b(i+1)
+' DEF FN j(x,i)=INT x-b(i+1)*INT (x/b(i+1))
+' DEF FN e(i$,j$)=(i$=j$( TO LEN (i$)))
+
+' LET e$=(b$+"   ")( TO 4): REM pad b$ with trailing spaces to len 4
+
 - Simpify parsing to begin with:
   - no comments
   - all labels must start with '!'
@@ -41,10 +50,11 @@
 
 1 REM org 32000
 2 REM       ld bc,@32002
-3 REM !loop ld b,5
+3 REM !loop ld b,#5
 4 REM       inc b
-5 REM
-6 REM #end#
+5 REM       ld (@32113),hl
+6 REM
+7 REM $end$
 
 10 DIM x$(255,10): DIM x(255): REM lookup struct, x$ opcode, x asm val
 11 FOR i=1 TO 8: READ x$(i): NEXT i: REM read into lookup struct
@@ -61,13 +71,14 @@
 50 LET codeLoc = (PEEK 23635 + (256*PEEK 23636)) + 5: REM ??? check offset 5 vs 6 ???
 
 75 DEF FN t$(a$)=a$(2 TO ): REM TL$
+80 DEF FN m(i$,j$)=(i$=j$( TO LEN (i$))): REM match i$ to start of j$
 
 100 REM aParseLine
 110 LET ch=PEEK codeLoc
 120 IF  ch=32 THEN GOTO aParseSpace
 130 IF  ch=13 THEN GOTO aParseEnter
 140 IF  ch=33 THEN GOTO aParseLabel
-150 IF  ch=35 THEN GOTO 9999: REM end
+150 IF  ch=36 THEN GOTO 9999: REM $end$
 160 GOTO aParseInstr
 170 PRINT "error: invalid line": STOP
 
@@ -84,6 +95,12 @@
 260 REM aParseInstr
 262 LET delim=13: GOSUB aGetToken
 264 PRINT t$: GOTO aParseLine
+
+----> start here <------
+aParseInstr
+get first 3 chars?
+create a hash?
+
 
 1000 REM aGetToken(ch,codeLoc,delim) returns t$,nl, delim 32->space delim 13->enter
 1002 LET t$=""
