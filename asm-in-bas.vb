@@ -78,20 +78,19 @@
 222 LET codeLoc = codeLoc + 6: GOTO aParseLine
 
 240 REM aParseLabel
-242 GOSUB aGetToken
+242 LET delim=32: GOSUB aGetToken
 244 PRINT t$: GOTO aParseLine
 
 260 REM aParseInstr
-262 GOSUB aGetToken
+262 LET delim=13: GOSUB aGetToken
 264 PRINT t$: GOTO aParseLine
 
-1000 REM aGetToken(ch,codeLoc) returns t$,nl
-1002 LET t$="": LET nl=0
-1004 FOR j=1 TO 9
+1000 REM aGetToken(ch,codeLoc,delim) returns t$,nl, delim 32->space delim 13->enter
+1002 LET t$=""
+1004 FOR j=1 TO 15
 1006   LET t$ = t$+chr$(ch)
 1008   LET codeLoc = codeLoc + 1
 1010   LET ch = PEEK codeLoc
-1012   IF  ch = 32 THEN RETURN
-1014   IF  ch = 13 THEN LET nl=1: RETURN
+1012   IF  ch = delim THEN RETURN
 1016 NEXT j
-1018 PRINT "error: token too long (> len 9)": STOP
+1018 PRINT "error: token too long (> len 15)": STOP
