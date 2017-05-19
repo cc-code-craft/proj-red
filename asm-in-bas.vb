@@ -24,28 +24,34 @@
 1 REM    
 2 REM 'comment
 3 REM loop ld a, 5
-4 REM end
+4 REM   inc a
+5 REM
+6 REM @end@ 64 ©end© 127
 
-5 DIM t(4,9): LET tok=1: REM token list, max 4 tokens of len 9
+10 LET t$="": LET tok=1: REM token list, max 4 tokens of len 9
 
-10 LET getToken = 200: LET getTokenRet = 151: REM Define GOTO line constants
+20 LET aGetToken = 200: LET aGetTokenRet = 151: REM Define GOTO line constants
 
-50 LET codeLoc = (PEEK 23635 + (256*PEEK 23636)) + 5
+50 LET codeLoc = (PEEK 23635 + (256*PEEK 23636)) + 5: REM ??? check offset 5 vs 6 ???
+
+75 DEF FN t$(a$)=a$(2 TO ): REM TL$
 
 99 REM While there is REM data to process
 100 LET ch = PEEK codeLoc
-130 IF  ch = 13 THEN LET codeLoc = codeLoc + 5: LET tok=1: GOTO 100: REM enter, reset token counter
+130 IF  ch = 13 THEN LET codeLoc = codeLoc + 6: LET tok=1: GOTO 100: REM enter, reset token counter
 140 IF  ch = 32 THEN LET codeLoc = codeLoc + 1: GOTO 100: REM space
-150 GOTO getToken
-160 PRINT t(1)
-170 STOP
+145 IF  ch = 64 THEN GOTO 9999: REM end
+150 GOTO aGetToken
+160 PRINT t$: LET t$=""
+170 GOTO 100
 
 
-199 REM getToken
+199 REM aGetToken
 200 FOR j=1 TO 9
-210   LET t(tok,j) = ch
+210   LET t$ = t$+chr$(ch)
 220   LET codeLoc = codeLoc + 1
 225   LET ch = PEEK codeLoc
-230   IF  ch = 32 THEN LET tok=tok+1: GOTO getTokenRet
+230   IF  ch = 32 THEN LET tok=tok+1: GOTO aGetTokenRet
+235   IF  ch = 13 THEN LET tok=tok+1: GOTO aGetTokenRet
 240 NEXT j
 241 PRINT "error: token too long (> len 8)": STOP
