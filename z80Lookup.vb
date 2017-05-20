@@ -1,4 +1,4 @@
-' Working! More testing needed. Create a single lookup table for all arg counts
+' Evaluate jumps, update rule 1, write machine code to memory.
 '
 'Z80 Opcodes
 ' - N  = 1 byte  (0-255)
@@ -61,13 +61,15 @@
 "----",36  |  | =>end<=
   u$     u       b      c      d       e       e$
 
+'=> arg types 1:N | 2:r | 3:(hl) | 4:(ir+No)| 5:rr
+
   a$     a       b      c      d       e       e$
 <op$>, <key> | <type>,<rule>,<code>,<offset>,<hex$>
 "and ",36, |36| 1,2,230,0, "e6 N    ",
            |37| 2,3,160,1, "a0 +    ",
            |38| 3,3,166,0, "a6      ",
            |39| 4,3,166,0, "dd a6 No",
-"call",40, |40| 1,5,205,0, "cd N N  ",
+"push",40, |40| 5,4,197,16,"c1 +    ",
 "dec ",41, |41| 2,3,5,  8, "05 +    ",
            |42| 3,3,35, 0, "35      ",
            |43| 4,3,35, 0, "dd 35 No",
@@ -1540,3 +1542,106 @@
 '       xor h             ac
 '       xor l             ad
 '       xor N             ee N
+
+-----------------------------------------------------
+   Analyzing Args: bc,de,hl,sp/af | ix,iy
+-----------------------------------------------------
+
+        -- prefix ed, offset => rule 1?
+'       adc hl,bc         ed 4a
+'       adc hl,de         ed 5a
+'       adc hl,hl         ed 6a
+'       adc hl,sp         ed 7a
+
+'       sbc hl,bc         ed 42
+'       sbc hl,de         ed 52
+'       sbc hl,hl         ed 62
+'       sbc hl,sp         ed 72
+        -----------------------      
+'       add hl,bc         09
+'       add hl,de         19
+'       add hl,hl         29
+'       add hl,sp         39
+
+'       add ix,bc         dd 09
+'       add ix,de         dd 19
+'       add ix,ix         dd 29
+'       add ix,sp         dd 39
+
+'       add iy,bc         fd 09
+'       add iy,de         fd 19
+'       add iy,iy         fd 29
+'       add iy,sp         fd 39
+
+        -----------------------
+        rule 4
+        -----------------------
+'       dec bc            0b
+'       dec de            1b
+'       dec hl            2b
+'       dec ix            dd 2b
+'       dec iy            fd 2b
+'       dec sp            3b
+
+'       inc bc            03       03
+'       inc de            13       19
+'       inc hl            23       35
+'       inc ix            dd 23
+'       inc iy            fd 23
+'       inc sp            33       51
+
+'       pop bc            c1
+'       pop de            d1
+'       pop hl            e1
+'       pop ix            dd e1
+'       pop iy            fd e1
+'       pop af            f1
+
+'       push bc           c5
+'       push de           d5
+'       push hl           e5
+'       push ix           dd e5
+'       push iy           fd e5
+'       push af           f5
+
+-----------------------------------------------------
+   Analyzing Args: (hl),(ix),(iy)
+-----------------------------------------------------
+
+'       jp (hl)           e9
+'       jp (ix)           dd e9
+'       jp (iy)           fd e9
+
+-----------------------------------------------------
+   Analyzing Args: z,c,pe,m | nz,nx,po,p
+-----------------------------------------------------
+
+'       call z,NN         cc N  N
+'       call c,NN         dc N  N
+'       call pe,NN        ec N  N
+'       call m,NN         fc N  N
+'
+'       call nz,NN        c4 N  N
+'       call nc,NN        d4 N  N
+'       call po,NN        e4 N  N
+'       call p,NN         f4 N  N
+
+'       jp z,NN           ca N N
+'       jp c,NN           da N N
+'       jp pe,NN          ea N N
+'       jp m,NN           fa N N
+'
+'       jp nz,NN          c2 N N
+'       jp nc,NN          d2 N N
+'       jp po,NN          e2 N N
+'       jp p,NN           f2 N N
+'       
+'       jr z,No           28 No
+'       jr c,No           38 No
+'       jr nz,No          20 No
+'       jr nc,No          30 No
+
+'       ret nz            c0
+'       ret nc            d0
+'       ret po            e0
+'       ret p             f0

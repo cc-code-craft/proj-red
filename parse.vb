@@ -1,5 +1,3 @@
-' Working! More testing needed. Create a single lookup table for all arg counts
-'
 1 REM       ini
 2 REM !loop ldd
 3 REM       nop
@@ -15,9 +13,10 @@
 14 REM       add a,(hl)
 15 REM       add a,(iy+@35)
 16 REM       add a,@14
-17 REM       $end$
+17 REM       push ix
+18 REM       dec de
+19 REM       $end$
 
-19 REM       push a
 20 REM       ret
 21 REM       org @32000
 22 REM       ld bc,@32002
@@ -37,8 +36,8 @@
 35 REM  - labels prefixed by '!', numbers by '@' and must be decimal
 
 36 REM --------------------------------------------------------------
-37 REM   temp vars: (free v,v$,g,h,q,s,s$)      i,j,k,                               t$,          w$,x$,x,y$,y,z,z$
-38 REM   DIM  vars: a,a$,b,c,d,e,e$,f,f$,g,g$,h,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,s$,   u,u$,v,v$,
+37 REM   temp vars: (free v,v$,g,h,h$,q,s$)     i,j,k,                            t$,          w$,x$,x,y$,y,z,z$
+38 REM   DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,   u,u$,_,_,
 39 REM --------------------------------------------------------------
  
 40 LET maxLabels=5: LET maxLines=20
@@ -111,7 +110,7 @@
 215 REM total opcodes1, a$=opcode, a=key
 216 LET tot1=4: DIM a$(tot1,4): DIM a(tot1)
 217 FOR i=1 TO tot1: READ a$(i), a(i): NEXT i
-218 DATA "and ",36,"call",40,"dec ",41,"----",45
+218 DATA "and ",36,"push",40,"dec ",41,"----",45
 
 219 REM total opcodes2, f$=opcode, g$=val, f=key
 220 LET tot2=7: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
@@ -122,12 +121,16 @@
 224 LET totK1=57: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
 225 FOR i=1 TO totK1: READ b(i), c(i), d(i), e(i), e$(i): NEXT i
 226 DATA 0,0,63, 0,"3f   ",0,1,169,0,"ed a9",0,1,185,0,"ed b9",0,1,161,0,"ed a1",0,1,177,0,"ed b1",0,0,47, 0,"2f   ",0,0,39, 0,"27   ",0,0,243,0,"f3   ",0,0,251,0,"fb   ",0,0,217,0,"d9   ",0,0,118,0,"76   ",0,1,170,0,"ed aa",0,1,186,0,"ed ba",0,1,162,0,"ed a2",0,1,178,0,"ed b2",0,1,168,0,"ed a8",0,1,184,0,"ed b8",0,1,160,0,"ed a0",0,1,176,0,"ed b0",0,1,68, 0,"ed 44",0,0,0,  0,"00   ",0,1,187,0,"ed bb",0,1,179,0,"ed b3",0,1,171,0,"ed ab",0,1,163,0,"ed a3",0,0,201,0,"c9   ",0,1,77, 0,"ed 4d",0,1,69, 0,"ed 45",0,1,23, 0,"17   ",0,0,7,  0,"07   ",0,1,111,0,"ed 6f",0,0,31, 0,"1f   ",0,0,15, 0,"0f   ",0,1,103,0,"ed 67",0,0,55, 0,"37   "
-227 DATA 1,2,230,0, "e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",2,3,5,  8, "05 +    ",3,3,35, 0, "35      ",4,3,35, 0, "dd 35 No",5,4,11, 16,"0b +    "
+227 DATA 1,2,230,0, "e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",5,4,197,16,"05 +    ",2,3,5,  8, "05 +    ",3,3,35, 0, "35      ",4,3,35, 0, "dd 35 No",5,4,11, 16,"0b +    "
 228 DATA 1,2,206,0, "ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + !!!",5,6,009,16,"dd 09 + ",5,6,009,16,"fd 09 + ",9,5,204,16,"cc N N  "
 
-231 REM reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
-232 DIM r(9): FOR k=1 TO 9: READ r(k): NEXT k
-233 DATA 7,0,1,2,3,0,0,4,5
+229 REM 8 bit reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
+230 DIM r(9): FOR k=1 TO 9: READ r(k): NEXT k
+231 DATA 7,0,1,2,3,0,0,4,5
+
+232 REM 16 bit reg offsets: a/f=3,b/c=0,-,d/e=1,-,-,-,h/l=2 | lookup 1st char | ix,iy,sp seperate
+233 DIM s(8): FOR k=1 TO 8: READ s(k): NEXT k
+234 DATA 3,0,0,1,0,0,0,2
 
 235 FOR i=1 TO lc-1
 236    IF n(i)=0 THEN GOTO gOpState0: REM no args
@@ -227,11 +230,9 @@
 1098 LET byteCount=byteCount+bytes
 1099 RETURN
 
-1100 REM sRuleBase:1 ed(237) <op> + | size=2 | prefix +offset
-1105 IF z$="" THEN LET w$="237 "+STR$(d(key)): LET bytes=2: GOTO 1195: REM no args
-1109 REM ======> KW: to do - if arg then lookup offset based on arg
-1110 LET w$="237 "+STR$(d(key)): LET bytes=2
-1195 GOSUB sPrintResult
+1100 REM sRuleBase:1 ed(237) <op> | size=2 | prefix
+1102 IF z$="" THEN LET w$="237 "+STR$(d(key)): LET bytes=2
+1197 GOSUB sPrintResult
 1198 LET byteCount=byteCount+bytes
 1199 RETURN
 
@@ -245,31 +246,39 @@
 1299 RETURN
 
 1300 REM sRuleBase:3 <op> r,(rr) | 1 byte | (ir+No) | 2 bytes
-1302 LET offset=0
+1302 LET offset=0: LET bytes=1: LET w$="": LET t$=""
 1304 LET lval=(CODE z$(1) - CODE("a")) + 1
 1306 IF  lval>0 THEN LET offset=r(lval)*e(key): GOTO 1340: REM a-l
 1308 LET offset=6*e(key): REM (hl)
 1310 IF  z$(2)="h" THEN GOTO 1340
 
-1314 LET t$=z$: REM process ix, iy
+1314 LET bytes=3: REM process ix, iy
+1315 LET t$=z$
 1316 LET d$="@": GOSUB sGetDelim: LET idx1=index+1
 1318 LET d$=")": GOSUB sGetDelim: LET idx2=index-1
 1320 LET t$=z$(idx1 TO idx2)
 1322 IF  z$(3)="x" THEN LET w$="dd "
 1324 IF  z$(3)="y" THEN LET w$="fd "
-1325 LET mcode=d(key)+offset
-1326 LET w$=w$+STR$(mcode)+" "+t$: LET bytes=3
-1335 GOTO 1397
 
-1340 LET mcode=d(key)+offset: LET bytes=1
-1344 LET w$=STR$(mcode)
+1340 LET mcode=d(key)+offset
+1342 LET w$=w$+STR$(mcode)+" "+t$
 
 1397 GOSUB sPrintResult
 1398 LET byteCount=byteCount+bytes
 1399 RETURN
 
 1400 REM sRuleBase:4 <op> rr + | size=1 | +offset | <op> ir | size=2
-1401 LET w$="r4": LET bytes=1: REM use key for lookup
+1402 LET offset=0: LET bytes=1: LET w$=""
+1404 LET lval=(CODE z$(1) - CODE("a")) + 1
+1406 IF  lval<9 THEN LET offset=r(lval)*e(key): GOTO 1440: REM af,bc,de,hl
+1408 IF  lval>9 THEN LET offset=3*e(key): GOTO 1440: REM sp
+1410 LET offset=2*e(key): LET bytes=2: REM ix,iy
+1412 IF  z$="ix" THEN LET w$="dd "
+1414 IF  z$="iy" THEN LET w$="fd "
+
+1440 LET mcode=d(key)+offset
+1442 LET w$=w$+STR$(mcode)
+
 1497 GOSUB sPrintResult
 1498 LET byteCount=byteCount+bytes
 1499 RETURN
