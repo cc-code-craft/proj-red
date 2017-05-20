@@ -2,9 +2,11 @@
 2 REM !loop ldd
 3 REM       nop
 4 REM       nop
-5 REM       di
-6 REM       ei
-7 REM       $end$
+5 REM       and c
+6 REM       and @12
+8 REM       and (ix+@125)
+9 REM       and (hl)
+10 REM       $end$
 
 11 REM       add a,b
 12 REM !loop add a,d
@@ -95,19 +97,21 @@
 201 REM 0=no args, 1=one arg, 2=two args
 202 LET byteCount=0
 203 LET gOpState0=260: LET gOpState1=280: LET gOpState2=300: LET gOpNext=248: LET gFinish=350
-204 LET sDebug1=8350
+204 LET sRuleBaseOneArg=1000: LET sRuleBaseTwoArgs=3000
+205 LET sDebug1=8350
 
-205 REM GOSUB sDebug1
+206 REM GOSUB sDebug1
 
-210 REM total opcodes0, opcode, v1, v2, v3, byte count, hex display
+210 REM total opcodes0, opcode, v1, v2, v3, bytes, hex display
 211 LET tot0=35: DIM t$(tot0,4): DIM t(tot0): DIM u(tot0): DIM v(tot0): DIM w(tot0): DIM w$(tot0,8)
 212 FOR i=1 TO tot0: READ t$(i), t(i), u(i), v(i), w(i), w$(i): NEXT i
 214 DATA "ccf ",63,0,0,1,"3f   ","cpd ",237,169,0,2,"ed a9","cpdr",237,185,0,2,"ed b9","cpi ",237,161,0,2,"ed a1","cpir",237,177,0,2,"ed b1","cpl ",47,0,0,1,"2f   ","daa ",39,0,0,1,"27   ","di  ",243,0,0,1,"f3   ","ei  ",251,0,0,1,"fb   ","en  ",217,0,0,1,"d9   ","halt",118,0,0,1,"76   ","ind ",237,170,0,2,"ed aa","indr",237,186,0,2,"ed ba","ini ",237,162,0,2,"ed a2","inir",237,178,0,2,"ed b2","ldd ",237,168,0,2,"ed a8","lddr",237,184,0,2,"ed b8","ldi ",237,160,0,2,"ed a0","ldir",237,176,0,2,"ed b0","neg ",237,68,0,2,"ed 44","nop ",0,0,0,1,"00   ","otdr",237,187,0,2,"ed bb","otir",237,179,0,2,"ed b3","outd",237,171,0,2,"ed ab","outi",237,163,0,2,"ed a3","ret ",201,0,0,1,"c9   ","reti",237,77,0,2,"ed 4d","retn",237,69,0,2,"ed 45","rla ",237,23,0,1,"17   ","rlca",7,0,0,1,"07   ","rld ",237,111,0,2,"ed 6f","rra ",31,0,0,1,"1f   ","rrca",15,0,0,1,"0f   ","rrd ",237,103,0,2,"ed 67","scf ",55,0,0,1,"37   "
 
-220 REM total opcodes1, opcode, v1/offset, v2/offset, v3, byte count, hex display
-221 LET tot1=1: DIM a$(tot1,4): DIM a(tot1): DIM b(tot1): DIM c(tot1): DIM d(tot1): DIM d$(tot1,8)
-222 FOR i=1 TO tot1: READ a$(i), a(i), b(i), c(i), d(i), d$(i): NEXT i
-224 DATA "and", 160, 0, 0, 1
+220 REM total opcodes1, opcode, type, rule, code, bytes, hex display, offset
+221 LET tot1=4: DIM a$(tot1,4): DIM a(tot1): DIM b(tot1): DIM c(tot1): DIM d(tot1): DIM d$(tot1,8): DIM e(tot1)
+222 FOR i=1 TO tot1: READ a$(i), a(i), b(i), c(i), d(i), d$(i), e(i): NEXT i
+
+224 DATA "and",1,1,230,2,"e6 N   ",0,"",2,2,160,1,"a0+offs",1,"",3,3,166,1,"a6     ",0,"",4,4,166,3,"dd a6 N",0
 
 240 FOR i=1 TO lc-1
 242    IF  n(i)=0 THEN GOTO gOpState0: REM no args
@@ -127,10 +131,23 @@
 280 REM gOpState1, one arg
 281 FOR j=1 TO tot1: IF NOT (m$(i,TO m(i))=a$(j,TO m(i))) THEN NEXT j
 282 IF j=tot1+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
-297 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+
+283 LET argType=0: LET ruleTotal=5: LET gGetRule=289: REM search for rule based on arg type
+284 IF n$(i,1)="@" THEN LET argType=1: GOTO gGetRule: REM one byte num 
+285 IF n(i)=1 THEN LET argType=2: GOTO gGetRule: REM b,c,d,e,h,l,a
+286 IF n(i)=2 THEN LET argType=5: GOTO gGetRule: REM bc,de,hl,ix,iy
+287 IF n(i)=4 THEN LET argType=3: GOTO gGetRule: REM (hl)
+288 LET argType=4: REM (ix+No),(iy+No)
+
+289 LET ruleTotal=4
+290 FOR k=0 TO ruleTotal-1: IF NOT a(j+k)=argType THEN NEXT k
+291 IF k=ruleTotal THEN PRINT "error: arg type not found - "+m$(i): STOP
+
+292 LET j=j+k
+293 GOSUB sRuleBaseOneArg+(b(j)*100)
 298 LET byteCount=byteCount+d(j)
 299 GOTO gOpNext
- 
+
 300 REM gOpState2
 319 GOTO gOpNext
 
@@ -152,6 +169,32 @@
 523    IF t$(k)=d$ THEN LET index=k: RETURN
 524 NEXT k
 525 RETURN
+
+1000 REM sRuleBaseOneArg:0
+1099 RETURN
+
+1100 REM sRuleBaseOneArg:1
+1101 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+1199 RETURN
+
+1200 REM sRuleBaseOneArg:2
+1201 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+1299 RETURN
+
+1300 REM sRuleBaseOneArg:3
+1301 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+1399 RETURN
+
+1400 REM sRuleBaseOneArg:4
+1401 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+1499 RETURN
+
+3000 REM sRuleBaseTwoArgs:0
+3099 RETURN
+3100 REM sRuleBaseTwoArgs:1
+3199 RETURN
+3200 REM sRuleBaseTwoArgs:2
+3299 RETURN
 
 8350 REM sDebug1
 8351 FOR i=1 TO lc-1

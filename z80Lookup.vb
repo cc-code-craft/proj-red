@@ -99,7 +99,29 @@ parse rule 0.1
 '   2.9 ld (bc),(de),(NN)....
 '   2.?? ld ....
 
-<op>,<type>,<rule>,<code><offset>
+<op>,<type>,<rule>,<code>,<bytes>,<hex str>,<offset>
+' pattern - one arg
+'   1.1: <op> N              | adc,add,sbc,sub,xor
+'   2.2: <op> b,c,d,e,h,l,a  | adc,add,sbc,sub,xor
+'   3.3: <op> (hl)           | adc,add,sbc,sub,xor
+'   4.4: <op> (ix+No),(iy+No)
+'   5.5: <op> bc,de,hl,ix,iy,sp/af
+'   1.6: <op> NN             | call,jp
+'   1.7: <op> No             | djnz,jr => calc rel val
+'   2.8: im 0,1,2
+'   3.9: jp (hl),(ix),(iy)
+'   2.10: ret z,c,pe,m
+'   5.11: ret nz,nc,po,p
+'   2.12: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+'   3.13: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+'   4.14: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+'   5.15: rst 0h to 38h
+
+"and",1,1,230,2,"e6 N   ",0
+   "",2,2,160,1,"a0+offs",1
+   "",3,3,166,1,"a6     ",0
+   "",4,4,166,3,"dd a6 N",0
+--------------------------------------------------
 
 <op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
 "and" ,230 ,160,166 ,1     ,0 ,0 ,0
@@ -157,6 +179,22 @@ parse rule 1.1
 "and (ix+No)",221,166,0,3,"dd a6 N"
 "and (iy+No)",253,166,0,3,"fd a6 N"
 "and a     ",167,0,1,1,"a7     "
+
+---------------------
+
+"and","1 N     ",1,1,230,0,0,2,"e6 N   "
+"and","1 b     ",2,2,160,0,1,1,"a0+offs"
+"and","1 c     ",1,1,161,0,1,1,"a1     "
+"and","1 d     ",1,1,162,0,1,1,"a2     "
+"and","1 e     ",1,1,163,0,1,1,"a3     "
+"and","1 h     ",1,1,164,0,1,1,"a4     "
+"and","1 l     ",1,1,165,0,1,1,"a5     "
+"and","1 (hl)  ",3,3,166,0,1,1,"a6     "
+"and","1 (ix+N)",4,4,221,166,0,3,"dd a6 N"
+"and","1 (iy+N)",1,1,253,166,0,3,"fd a6 N"
+"and","1 a     ",1,1,167,0,1,1,"a7     "
+
+---------------------
 
 "call NN   ",205,0,0,0,"cd     "
 
