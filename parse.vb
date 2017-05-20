@@ -96,7 +96,7 @@
 200 REM Define lookup level based on opcode and args
 201 REM 0=no args, 1=one arg, 2=two args
 202 LET byteCount=0
-203 LET gOpState0=250: LET gOpState1=300: LET gOpState2=350: LET gOpNext=239: LET gFinish=400
+203 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350: LET gFinish=400
 204 LET sRuleBaseOneArg=1000: LET sRuleBaseTwoArgs=3000
 205 LET sDebug1=8350
 
@@ -107,28 +107,32 @@
 212 FOR i=1 TO tot0: READ t$(i), t(i), u(i), v(i), w(i), w$(i): NEXT i
 214 DATA "ccf ",63,0,0,1,"3f   ","cpd ",237,169,0,2,"ed a9","cpdr",237,185,0,2,"ed b9","cpi ",237,161,0,2,"ed a1","cpir",237,177,0,2,"ed b1","cpl ",47,0,0,1,"2f   ","daa ",39,0,0,1,"27   ","di  ",243,0,0,1,"f3   ","ei  ",251,0,0,1,"fb   ","en  ",217,0,0,1,"d9   ","halt",118,0,0,1,"76   ","ind ",237,170,0,2,"ed aa","indr",237,186,0,2,"ed ba","ini ",237,162,0,2,"ed a2","inir",237,178,0,2,"ed b2","ldd ",237,168,0,2,"ed a8","lddr",237,184,0,2,"ed b8","ldi ",237,160,0,2,"ed a0","ldir",237,176,0,2,"ed b0","neg ",237,68,0,2,"ed 44","nop ",0,0,0,1,"00   ","otdr",237,187,0,2,"ed bb","otir",237,179,0,2,"ed b3","outd",237,171,0,2,"ed ab","outi",237,163,0,2,"ed a3","ret ",201,0,0,1,"c9   ","reti",237,77,0,2,"ed 4d","retn",237,69,0,2,"ed 45","rla ",237,23,0,1,"17   ","rlca",7,0,0,1,"07   ","rld ",237,111,0,2,"ed 6f","rra ",31,0,0,1,"1f   ","rrca",15,0,0,1,"0f   ","rrd ",237,103,0,2,"ed 67","scf ",55,0,0,1,"37   "
 
-220 REM total opcodes1, opcode, type, rule, code, bytes, hex display, offset
-221 LET tot1=4: DIM a$(tot1,4): DIM a(tot1): DIM b(tot1): DIM c(tot1): DIM d(tot1): DIM d$(tot1,8): DIM e(tot1)
-222 FOR i=1 TO tot1: READ a$(i), a(i), b(i), c(i), d(i), d$(i), e(i): NEXT i
+220 REM total opcodes1, opcode, key
+221 LET tot1=4: DIM a$(tot1,4): DIM a(tot1)
+222 FOR i=1 TO tot1: READ a$(i), a(i): NEXT i
+223 DATA "and",1,"call",5,"dec",6,"---",10
 
-224 DATA "and",1,1,230,2,"e6 N   ",0,"",2,2,160,1,"a0+offs",1,"",3,3,166,1,"a6     ",0,"",4,4,166,3,"dd a6 N",0
+224 REM total keys, b=type, c=rule, d=code, e=bytes, f=offset, f$=hex display
+225 LET totK=9: DIM b(totK): DIM c(totK): DIM d(totK): DIM e(totK): DIM f(totK): DIM f$(totK,9)
+226 FOR i=1 TO totK: READ b(i), c(i), d(i), e(i), f(i), f$(i): NEXT i
+227 DATA 1,1,230,2,0,"e6 N     ",2,2,160,1,1,"a0+offset",3,3,166,1,0,"a6       ",4,4,166,3,0,"dd a6 No ",1,6,205,3,0,"cd N N   ",2,2,5,1,8,"05+offset",3,3,35,1,0,"35       ",4,4,35,3,0,"dd 35 No ",5,5,11,1,16,"0b+offset"
 
-225 REM reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
-226 DIM o(9): FOR k=1 TO 9: READ o(k): NEXT k
-227 DATA 7,0,1,2,3,0,0,4,5
+230 REM reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
+231 DIM r(9): FOR k=1 TO 9: READ r(k): NEXT k
+232 DATA 7,0,1,2,3,0,0,4,5
 
 235 FOR i=1 TO lc-1
 236    IF  n(i)=0 THEN GOTO gOpState0: REM no args
 237    IF  o(i)=0 THEN GOTO gOpState1: REM one arg
 238    GOTO gOpState2: REM two args
-239 NEXT i: REM gOpNext
+240 NEXT i: REM gOpNext
 
-240 GOTO gFinish
+245 GOTO gFinish
 
 250 REM gOpState0, no args
 251 FOR j=1 TO tot0: IF NOT (m$(i,TO m(i))=t$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),t$(j))
 252 IF j=tot0+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
-253 PRINT STR$(byteCount)+"  "+m$(i)+"  "+w$(j)
+253 PRINT STR$(byteCount)+" "+m$(i)+" "+w$(j)+" no args"
 254 LET byteCount=byteCount+w(j)
 256 GOTO gOpNext
 
@@ -136,26 +140,24 @@
 301 FOR j=1 TO tot1: IF NOT (m$(i,TO m(i))=a$(j,TO m(i))) THEN NEXT j
 302 IF j=tot1+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
 
-304 REM check for irregular type first (type:99) => apply rule directly
-305 IF a(j)=99 THEN GOSUB sRuleBaseOneArg+(b(j)*100): GOTO gOpNext
+304 REM =======> Start Here 1 <=========
+305 IF b(j)=9 THEN GOSUB sRuleBaseOneArg+(c(j)*100): REM match any arg type
 
-306 REM =======> Start Here 1 <=========
-
-308 LET argType=0: LET ruleTotal=5: LET gGetRule=315: REM search for rule based on arg type
-309 IF n$(i,1)="@" THEN LET argType=1: GOTO gGetRule: REM one byte num 
-310 IF n(i)=1 THEN LET argType=2: GOTO gGetRule: REM b,c,d,e,h,l,a
-311 IF n(i)=2 THEN LET argType=5: GOTO gGetRule: REM bc,de,hl,ix,iy
-312 IF n(i)=4 THEN LET argType=3: GOTO gGetRule: REM (hl)
+308 LET gLookupArg=315: LET argType=0: REM get rule to process arg
+309 IF n$(i,1)="@" THEN LET argType=1: GOTO gLookupArg: REM one byte num 
+310 IF n(i)=1 THEN LET argType=2: GOTO gLookupArg: REM b,c,d,e,h,l,a
+311 IF n(i)=2 THEN LET argType=5: GOTO gLookupArg: REM bc,de,hl,ix,iy
+312 IF n(i)=4 THEN LET argType=3: GOTO gLookupArg: REM (hl)
 313 LET argType=4: REM (ix+No),(iy+No)
 
-315 REM gGetRule
-316 LET ruleTotal=4
-317 FOR k=0 TO ruleTotal-1: IF NOT a(j+k)=argType THEN NEXT k
-318 IF k=ruleTotal THEN PRINT "error: arg type not found - "+m$(i): STOP
+315 REM gLookupArg
+316 LET rules=a(j+1)-a(j)
+317 FOR k=0 TO rules-1: IF NOT b(j+k)=argType THEN NEXT k
+318 IF k=rules THEN PRINT "error: arg type not found - "+m$(i): STOP
 
 319 LET j=j+k
-320 GOSUB sRuleBaseOneArg+(b(j)*100)
-321 LET byteCount=byteCount+d(j)
+320 GOSUB sRuleBaseOneArg+(c(j)*100)
+321 LET byteCount=byteCount+e(j)
 322 GOTO gOpNext
 
 350 REM gOpState2
@@ -185,7 +187,7 @@
 1099 RETURN
 
 1100 REM sRuleBaseOneArg:1
-1101 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+1101 PRINT STR$(byteCount)+" "+m$(i)+" "+f$(j)+" type1"
 1148 RETURN
 
 1149 REM =======> Start Here 2 <=========
@@ -193,8 +195,8 @@
 1200 REM sRuleBaseOneArg:2
 1202 LET offset=0
 1204 LET lval=(CODE n$(i) - CODE("a")) + 1
-1206 IF lval>0 THEN LET offset=o(lval)*e(j): GOTO 1250: REM RETURN
-1208 LET offset=6*e(j)
+1206 IF lval>0 THEN LET offset=r(lval)*f(j): GOTO 1250: REM RETURN
+1208 LET offset=6*f(j)
 1210 IF n$(i,2)="h" THEN GOTO 1250: REM RETURN
 1212 REM process ix, iy
 1214 LET t$=n$(i): LET idx1=0: LET idx2=0
@@ -204,15 +206,15 @@
 1222 IF n$(i,3)="x" THEN PRINT "ix=>dd "+STR$(offset)+" "+t$
 1224 IF n$(i,3)="y" THEN PRINT "iy=>fd "+STR$(offset)+" "+t$
 
-1250 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)+"  offset "+STR$(offset)
+1250 PRINT STR$(byteCount)+" "+m$(i)+" "+f$(j)+" type2 offset "+STR$(offset)
 1299 RETURN
 
 1300 REM sRuleBaseOneArg:3
-1301 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+1301 PRINT STR$(byteCount)+" "+m$(i)+" "+f$(j)+" type3"
 1399 RETURN
 
 1400 REM sRuleBaseOneArg:4
-1401 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+1401 PRINT STR$(byteCount)+" "+m$(i)+" "+f$(j)+" type4"
 1499 RETURN
 
 3000 REM sRuleBaseTwoArgs:0
