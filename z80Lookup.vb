@@ -25,6 +25,12 @@
 ' parse 0 args
 ' ccf cpd cpdr cpi cpir cpl daa di ei en halt ind indr ini inir ldd lddr ldi ldir neg nop otdr otir outd outi ret(^), reti, retn, rla rlca rld rra rrca rrd scf
 
+'<op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
+'"ccf ",0   ,63 ,0   ,0     ,0 ,0 ,0
+'"cpd" ,0   ,169,0   ,0     ,0 ,0 ,0    
+
+parse rule 0.1
+<op>  ,c1,c2,0,b,<hex>
 "ccf ",63,0,0,1,"3f   ",
 "cpd ",237,169,0,2,"ed a9",
 "cpdr",237,185,0,2,"ed b9",
@@ -65,6 +71,45 @@
 ' parse 1 arg
 ' and djnz im inc(^) jp(') jr(') or pop push ret rst sra srl
 
+' Alternative Lookup Table
+' <op>,<parse mode>,<parse func>,<param1>,<param2>
+'
+
+' pattern
+'   1.0: <op> N,b,c,d,e,h,l,(hl),(ix+No)(iy+No),a | adc,add,sbc,sub,xor
+'   1.1: <op> bc,de,hl,ix,iy,sp/af
+'   1.2: <op> N N                                 | call,jp
+'   1.3: <op-calc-rel-jmp> No                     | djnz,jr
+'   1.4: im 0,1,2
+'   1.5: jp (hl),(ix),(iy)
+'   1.6: ret z,c,pe,m
+'   1.7: ret nz,nc,po,p
+'   1.8: <op> cb prefix, then 1.1    | rl,rlc,rr,rrc,sla,sra,srl
+'   1.9: rst 0h to 38h
+'
+'   2.0: <op> <r> N,b,c,d,e,h,l,(hl),(ix+No)(iy+No),a | ld,adc,add
+'   2.1: <op> <rr> bc,de,hl,ix,iy,sp/af               | adc hl,add hl,sbc hl
+'   2.2: <op> z,c,pe,m   N N                          | call,jp
+'   2.3: <op> nz,nc,po,p N N                          | call,jp
+'   2.4: ex (sp)|af|de
+'   2.5: in|out (ed prefix)
+'   2.6: <jr-calc-rel-jmp> z,c,nz,nc No
+'   2.7: sbc a
+'   2.8: <op> cb prefix, then 2.1     | bit,res,set
+'   2.9 ld (bc),(de),(NN)....
+'   2.?? ld ....
+
+<op>,<type>,<rule>,<code><offset>
+
+<op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
+"and" ,230 ,160,166 ,1     ,0 ,0 ,0
+
+<op>  ,arg1, N|NN,r  ,(hl),offset,rr,hl,offset
+"ld"  ,"b-l",06  ,40 ,46  ,1     ,0 ,0 ,0
+
+<op>,prefix(0|num),arg1,r,(hl),offset... | <op>,rule,param1,param2,...
+'-----------------------------------------------------------------------
+
 -consider adding type: <op>,<type>,...
   - type 0: no args, type 1: one arg,8-bit, type 2: one arg,16-bit
 -consider adding prefix
@@ -72,26 +117,34 @@
 - consider combining type & prefix using bit vals (to decimal)
   - 000ppttt: 0=>p=0,t=0 1=>p=0,t=1 8=>p=1,t=0
 
+N=1 byte (0 to 255), No=1 byte (-127 to +127), NN=2 bytes
+
 op N|NN = 2|3 bytes (calc bytes: N if < 256, otherwise NN)
 op r = 1 byte
 op (ir+N) = 3 bytes
 op rr = 1 byte
 op ir = 2 bytes
 
+lookup val based on arg type: N number, r 8bit reg, rr 16bit reg
 lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 
+Hex Conversion
+((n:0-15)*16)+(n:0-16)
+
+parse rule 1.1
 <op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
-"dec" ,0   ,05 ,35  ,8     ,11,43,16    
 "and" ,230 ,160,166 ,1     ,0 ,0 ,0
 "call",205 ,0  ,0   ,0     ,0 ,0 ,0
 "cp"  ,254 ,184,190 ,1     ,0 ,0 ,0
+"dec" ,0   ,05 ,35  ,8     ,11,43,16    
+"jr"  ,18  ,0  ,0   ,0     ,0 ,0 ,0
 
 ---------------------
 
 "and N     ",230,0,0,2,    "hh N   "  opcode, 2 bytes
 "and r     ",160,0,1,1,    "hh     "  start opcode 160, offset 1, 1 byte
 "and (hl)  ",166,0,1,1,    "hh     "  merge with above?
-"and (ir+N)",221,253,166,3,"hh hh N"  ix, iy, opcode, 3 bytes
+"and (ir+No)",221,253,166,3,"hh hh No"  ix, iy, opcode, 3 bytes
 
 "and N     ",230,0,0,2,"e6 N   "
 "and b     ",160,0,1,1,"a0     "
@@ -101,8 +154,8 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 "and h     ",164,0,1,1,"a4     "
 "and l     ",165,0,1,1,"a5     "
 "and (hl)  ",166,0,1,1,"a6     "
-"and (ix+N)",221,166,0,3,"dd a6 N"
-"and (iy+N)",253,166,0,3,"fd a6 N"
+"and (ix+No)",221,166,0,3,"dd a6 N"
+"and (iy+No)",253,166,0,3,"fd a6 N"
 "and a     ",167,0,1,1,"a7     "
 
 "call NN   ",205,0,0,0,"cd     "
@@ -122,8 +175,8 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 "dec h     ",37,0,32,1, "25     "
 "dec l     ",45,0,40,1, "2d     "
 "dec (hl)  ",53,0,48,1, "35     "
-"dec (ix+N)",221,53,0,3,"dd 35 N"
-"dec (iy+N)",253,53,0,3,"fd 35 N"
+"dec (ix+No)",221,53,0,3,"dd 35 N"
+"dec (iy+No)",253,53,0,3,"fd 35 N"
 "dec a     ",61,0,8,1,  "3d     "
 "dec bc    ",11,0,0,0,  "0b     "
 "dec de    ",27,0,16,1, "1b     "
@@ -133,12 +186,246 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 "dec sp    ",59,0,48,1, "3b     "
 
 '---------------------------------------------------------------                        
+' parse 1 arg
+'
+'       and N             e6 N
+'       and b             a0
+'       and c             a1
+'       and d             a2
+'       and e             a3
+'       and h             a4
+'       and l             a5
+'       and (hl)          a6
+'       and (ix+No)        dd a6 N
+'       and (iy+No)        fd a6 N
+'       and a             a7
+'
+'       call NN           cd N  N
+'
+'       cp N              fe N
+'       cp b              b8
+'       cp c              b9
+'       cp d              ba
+'       cp e              bb
+'       cp h              bc
+'       cp l              bd
+'       cp (hl)           be
+'       cp (ix+No)         dd be N
+'       cp (iy+No)         fd be N
+'       cp a              bf
+'
+'       dec b             05       05    
+'       dec c             0d       13    +8
+'       dec d             15       21    +8
+'       dec e             1d       29    +8
+'       dec h             25       37    +8
+'       dec l             2d       45    +8
+'       dec (hl)          35       53    +8
+'       dec (ix+No)        dd 35 N       
+'       dec (iy+No)        fd 35 N       
+'       dec a             3d       61    +8
+'
+'       dec bc            0b       11    +16
+'       dec de            1b       27    +16
+'       dec hl            2b       43    +16
+'       dec ix            dd 2b       
+'       dec iy            fd 2b       
+'       dec sp            3b       59    +16
+'
+'       djnz No (+/-128)  10 No (+/-128)
+'
+'       im 0              ed 46
+'       im 1              ed 56
+'       im 2              ed 5e
+'
+'       inc b             04       04
+'       inc c             0c       12
+'       inc d             14       20
+'       inc e             1c       28
+'       inc h             24       36
+'       inc l             2c       44
+'       inc (hl)          34       52
+'       inc (ix+No)        dd 34 N
+'       inc (iy+No)        fd 34 N
+'       inc a             3c       60
+'
+'       inc bc            03       03
+'       inc de            13       19
+'       inc hl            23       35
+'       inc ix            dd 23
+'       inc iy            fd 23
+'       inc sp            33       51
+'
+'       jr No             18 No
+'
+'       jp N N            c3 N N
+'       jp (hl)           e9
+'       jp (ix)           dd e9
+'       jp (iy)           fd e9
+'
+'       or N              f6 N
+'       or b              b0
+'       or c              b1
+'       or d              b2
+'       or e              b3
+'       or h              b4
+'       or l              b5
+'       or (hl)           b6
+'       or (ix+No)         dd b6 N
+'       or (iy+No)         fd b6 N
+'       or a              b7
+
+'       pop bc            c1
+'       pop de            d1
+'       pop hl            e1
+'       pop ix            dd e1
+'       pop iy            fd e1
+'       pop af            f1
+
+'       push bc           c5
+'       push de           d5
+'       push hl           e5
+'       push ix           dd e5
+'       push iy           fd e5
+'       push af           f5
+
+'       ret z             c8
+'       ret c             d8
+'       ret pe            e8
+'       ret m             f8
+'
+'       ret nz            c0
+'       ret nc            d0
+'       ret po            e0
+'       ret p             f0
+'
+'       rl  b             cb 10
+'       rl  c             cb 11
+'       rl  d             cb 12
+'       rl  e             cb 13
+'       rl  h             cb 14
+'       rl  l             cb 15
+'       rl  (hl)          cb 16
+'       rl (ix+No)         dd cb N  16
+'       rl (iy+No)         fd cb N  16
+'       rl  a             cb 17
+'
+'       rlc b             cb 00
+'       rlc c             cb 01
+'       rlc d             cb 02
+'       rlc e             cb 03
+'       rlc h             cb 04
+'       rlc l             cb 05
+'       rlc (hl)          cb 06
+'       rlc (ix+No)        dd cb N  06
+'       rlc (iy+No)        fd cb N  06
+'       rlc a             cb 07
+'
+'       rr  b             cb 18
+'       rr  c             cb 19
+'       rr  d             cb 1a
+'       rr  e             cb 1b
+'       rr  h             cb 1c
+'       rr  l             cb 1d
+'       rr  (hl)          cb 1e
+'       rr (ix+No)         dd cb N  1e
+'       rr (iy+No)         fd cb N  1e
+'       rr  a             cb 1f
+'
+'       rrc b             cb 08
+'       rrc c             cb 09
+'       rrc d             cb 0a
+'       rrc e             cb 0b
+'       rrc h             cb 0c
+'       rrc l             cb 0d
+'       rrc (hl)          cb 0e
+'       rrc (ix+No)        dd cb N  0e
+'       rrc (iy+No)        fd cb N  0e
+'       rrc a             cb 0f
+'
+'       rst 0             c7
+'       rst 8h            cf
+'       rst 10h           d7
+'       rst 18h           df
+'       rst 20h           e7
+'       rst 28h           ef
+'       rst 30h           f7
+'       rst 38h           ff
+'
+'       sbc b             98
+'       sbc c             99
+'       sbc d             9a
+'       sbc e             9b
+'       sbc h             9c
+'       sbc l             9d
+'       sbc (hl)          9e
+'       sbc a             9f
+'
+'       sla b             cb 20
+'       sla c             cb 21
+'       sla d             cb 22
+'       sla e             cb 23
+'       sla h             cb 24
+'       sla l             cb 25
+'       sla (hl)          cb 26
+'       sla (ix+No)        dd cb N  26
+'       sla (iy+No)        fd cb N  26
+'       sla a             cb 27
+'
+'       sra b             cb 28
+'       sra c             cb 29
+'       sra d             cb 2a
+'       sra e             cb 2b
+'       sra h             cb 2c
+'       sra l             cb 2d
+'       sra (hl)          cb 2e
+'       sra (ix+No)        dd cb N  2e
+'       sra (iy+No)        fd cb N  2e
+'       sra a             cb 2f
+'
+'       srl b             cb 38
+'       srl c             cb 39
+'       srl d             cb 3a
+'       srl e             cb 3b
+'       srl h             cb 3c
+'       srl l             cb 3d
+'       srl (hl)          cb 3e
+'       srl a             cb 3f
+'
+'       sub N             d6 N
+'       sub b             90
+'       sub c             91
+'       sub d             92
+'       sub e             93
+'       sub h             94
+'       sub l             95
+'       sub (hl)          96
+'       sub (ix+No)        dd 96 N
+'       sub (iy+No)        fd 96 N
+'       sub a             97
+'
+'       xor N             ee N
+'       xor b             a8
+'       xor c             a9
+'       xor d             aa
+'       xor e             ab
+'       xor h             ac
+'       xor l             ad
+'       xor (hl)          ae
+'       xor (ix+No)        dd ae N
+'       xor (iy+No)        fd ae N
+'       xor a             af
+'
+'
+'---------------------------------------------------------------                        
 ' parse 2 args
-
-
+'
+'
 '       ld bc,NN          01 N  N
 '       ld de,NN          11 N  N
 '       ld hl,NN          21 N  N
+'       ld ix,NN          dd 21 N  N
+'       ld iy,NN          fd 21 N  N
 '       ld sp,NN          31 N  N
 '
 '       ld (bc),a         02
@@ -154,9 +441,23 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '
 '       ld bc,(NN)        ed 4b N  N
 '       ld de,(NN)        ed 5b N  N
+'       ld hl,(NN) <*>    ed 5b N  N <*>
 '       ld sp,(NN)        ed 7b N  N
 '
-'       ld hl,(NN)        2a N  N
+'       ld hl,(NN) <*>    2a N  N <*>
+'       ld ix,(NN)        dd 2a N  N
+'       ld iy,(NN)        fd 2a N  N
+'
+'       ld sp,hl          f9
+'       ld sp,ix          dd f9
+'       ld sp,iy          fd f9
+'
+'       ld i,a            ed 47
+'       ld a,i            ed 57
+'
+'       ld a,(bc)         0a
+'       ld a,(de)         1a
+'       ld a,(NN)         3a N  N
 '
 '       ld (hl),N         36 N
 '       ld (hl),b         70
@@ -167,43 +468,58 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       ld (hl),l         75
 '       ld (hl),a         77
 '
-'       ld (ix+N),N       dd 36 N  N
-'       ld (ix+N),b       dd 70 N
-'       ld (ix+N),c       dd 71 N
-'       ld (ix+N),d       dd 72 N
-'       ld (ix+N),e       dd 73 N
-'       ld (ix+N),h       dd 74 N
-'       ld (ix+N),l       dd 75 N
+'       ld (ix+No),N       dd 36 N  N
+'       ld (ix+No),b       dd 70 N
+'       ld (ix+No),c       dd 71 N
+'       ld (ix+No),d       dd 72 N
+'       ld (ix+No),e       dd 73 N
+'       ld (ix+No),h       dd 74 N
+'       ld (ix+No),l       dd 75 N
 '                         -------
-'       ld (ix+N),a       dd 77 N
+'       ld (ix+No),a       dd 77 N
 '
-'       ld (iy+N),N       fd 36 N  N
-'       ld (iy+N),b       fd 70 N
-'       ld (iy+N),c       fd 71 N
-'       ld (iy+N),d       fd 72 N
-'       ld (iy+N),e       fd 73 N
-'       ld (iy+N),h       fd 74 N
-'       ld (iy+N),l       fd 75 N
+'       ld (iy+No),N       fd 36 N  N
+'       ld (iy+No),b       fd 70 N
+'       ld (iy+No),c       fd 71 N
+'       ld (iy+No),d       fd 72 N
+'       ld (iy+No),e       fd 73 N
+'       ld (iy+No),h       fd 74 N
+'       ld (iy+No),l       fd 75 N
 '                         -------
-'       ld (iy+N),a       fd 77 N
+'       ld (iy+No),a       fd 77 N
 '
-'       ld a,(bc)         0a
-'       ld a,(de)         1a
-'       ld a,(NN)         3a N  N
+'       ----------------------------------
 '
-'       ld a,N            3e N
-'       ld a,b            78
-'       ld a,c            79
-'       ld a,d            7a
-'       ld a,e            7b
-'       ld a,h            7c
-'       ld a,l            7d
-'       ld a,(hl)         7e
-'       ld a,(ix+N)       dd 7e N
-'       ld a,(iy+N)       fd 7e N
-'       ld a,a            7f
-'
+parse rule 2.1
+<op>  ,arg1, N|NN,r  ,(hl),offset,rr,hl,offset
+"ld"  ,"b-l",06  ,40 ,46  ,1     ,0 ,0 ,0
+"ld"  ,"a" , 3e  ,78 ,7e  ,1     ,0 ,0 ,0
+"adc" ,"a" , ce  ,88 ,8e  ,1     ,4a,? ,16(4)
+"adc" ,"hl"
+"add" ,"a" , c6  ,80 ,86  ,1     ,09,09 ,16(4)
+"add" ,"hl"
+"add" ,"ix"
+"add" ,"iy"
+"call","z"...
+"call","nz"...
+"jp"  ,"z"...
+"jp"  ,"nz"...
+"jr"  ,"z"...  (also "jr" one arg)
+
+parse rule 2.2
+"bit" ,"0-7",0   ,cb|40(2 byte op), 46... rule breaker
+"res"
+"set"
+
 '       ld b,N            06 N
+'       ld c,N            0e N
+'       ld d,N            16 N
+'       ld e,N            1e N
+'       ld h,N            26 N
+'       ld l,N            2e N
+'       ------            ----
+'       ld a,N            3e N
+
 '       ld b,b            40
 '       ld b,c            41
 '       ld b,d            42
@@ -211,11 +527,10 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       ld b,h            44
 '       ld b,l            45
 '       ld b,(hl)         46
-'       ld b,(ix+N)       dd 46 N
-'       ld b,(iy+N)       fd 46 N
+'       ld b,(ix+No)       dd 46 N
+'       ld b,(iy+No)       fd 46 N
 '       ld b,a            47
 '
-'       ld c,N            0e N
 '       ld c,b            48
 '       ld c,c            49
 '       ld c,d            4a
@@ -223,11 +538,10 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       ld c,h            4c
 '       ld c,l            4d
 '       ld c,(hl)         4e
-'       ld c,(ix+N)       dd 4e N
-'       ld c,(iy+N)       fd 4e N
+'       ld c,(ix+No)       dd 4e N
+'       ld c,(iy+No)       fd 4e N
 '       ld c,a            4f
 '
-'       ld d,N            16 N
 '       ld d,b            50
 '       ld d,c            51
 '       ld d,d            52
@@ -235,11 +549,10 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       ld d,h            54
 '       ld d,l            55
 '       ld d,(hl)         56
-'       ld d,(ix+N)       dd 56 N
-'       ld d,(iy+N)       fd 56 N
+'       ld d,(ix+No)       dd 56 N
+'       ld d,(iy+No)       fd 56 N
 '       ld d,a            57
 '
-'       ld e,N            1e N
 '       ld e,b            58
 '       ld e,c            59
 '       ld e,d            5a
@@ -247,11 +560,10 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       ld e,h            5c
 '       ld e,l            5d
 '       ld e,(hl)         5e
-'       ld e,(ix+N)       dd 5e N
-'       ld e,(iy+N)       fd 5e N
+'       ld e,(ix+No)       dd 5e N
+'       ld e,(iy+No)       fd 5e N
 '       ld e,a            5f
 '
-'       ld h,N            26 N
 '       ld h,b            60
 '       ld h,c            61
 '       ld h,d            62
@@ -259,19 +571,10 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       ld h,h            64
 '       ld h,l            65
 '       ld h,(hl)         66
-'       ld h,(ix+N)       dd 66 N
-'       ld h,(iy+N)       fd 66 N
+'       ld h,(ix+No)       dd 66 N
+'       ld h,(iy+No)       fd 66 N
 '       ld h,a            67
 '
-'       ld ix,(NN)        dd 2a N  N
-'       ld ix,NN          dd 21 N  N
-'       ld iy,(NN)        fd 2a N  N
-'       ld iy,NN          fd 21 N  N
-'
-'       ld i,a            ed 47
-'       ld a,i            ed 57
-'
-'       ld l,N            2e N
 '       ld l,b            68
 '       ld l,c            69
 '       ld l,d            6a
@@ -279,13 +582,22 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       ld l,h            6c
 '       ld l,l            6d
 '       ld l,(hl)         6e
-'       ld l,(ix+N)       dd 6e N
-'       ld l,(iy+N)       fd 6e N
+'       ld l,(ix+No)       dd 6e N
+'       ld l,(iy+No)       fd 6e N
 '       ld l,a            6f
 '
-'       ld sp,hl          f9
-'       ld sp,ix          dd f9
-'       ld sp,iy          fd f9
+'       ------            --
+'
+'       ld a,b            78
+'       ld a,c            79
+'       ld a,d            7a
+'       ld a,e            7b
+'       ld a,h            7c
+'       ld a,l            7d
+'       ld a,(hl)         7e
+'       ld a,(ix+No)       dd 7e N
+'       ld a,(iy+No)       fd 7e N
+'       ld a,a            7f
 '
 '       adc a,N           ce N
 '       adc a,b           88
@@ -295,8 +607,8 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       adc a,h           8c
 '       adc a,l           8d
 '       adc a,(hl)        8e
-'       adc a,(ix+N)      dd 8e N
-'       adc a,(iy+N)      fd 8e N
+'       adc a,(ix+No)      dd 8e N
+'       adc a,(iy+No)      fd 8e N
 '       adc a,a           8f
 '       
 '       adc hl,bc         ed 4a
@@ -312,8 +624,8 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       add a,h           84
 '       add a,l           85
 '       add a,(hl)        86
-'       add a,(ix+N)      dd 86 N
-'       add a,(iy+N)      fd 86 N
+'       add a,(ix+No)      dd 86 N
+'       add a,(iy+No)      fd 86 N
 '       add a,a           87
 '       
 '       add hl,bc         09
@@ -334,228 +646,306 @@ lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
 '       call c,NN         dc N  N
 '       call pe,NN        ec N  N
 '       call m,NN         fc N  N
+'
 '       call nz,NN        c4 N  N
 '       call nc,NN        d4 N  N
 '       call po,NN        e4 N  N
 '       call p,NN         f4 N  N
 '
-'       jp z,$+3          ca
-'       jp c,$+3          da
-'       jp pe,$+3         ea
-'       jp m,$+3          fa
+'       ex (sp),hl        e3
+'       ex (sp),ix        dd e3
+'       ex (sp),iy        fd e3
+'       ex af,af'         08
+'       ex de,hl          eb
+'
+'       in a,(N)          db N
+'       in a,(c)          ed 78
+'       in b,(c)          ed 40
+'       in c,(c)          ed 48
+'       in d,(c)          ed 50
+'       in e,(c)          ed 58
+'       in h,(c)          ed 60
+'       in l,(c)          ed 68
+'
+'       jp z,NN           ca N N
+'       jp c,NN           da N N
+'       jp pe,NN          ea N N
+'       jp m,NN           fa N N
+'
+'       jp nz,NN          c2 N N
+'       jp nc,NN          d2 N N
+'       jp po,NN          e2 N N
+'       jp p,NN           f2 N N
 '       
-'       jp nz,$+3         c2
-'       jp nc,$+3         d2
-'       jp po,$+3         e2
-'       jp p,$+3          f2
-'       
-'       jr $+2            18
-'       jr z,$+2          28
-'       jr c,$+2          38
-'       jr nz,$+2         20
-'       jr nc,$+2         30
-
-'----- One Arg  -----------------------------------------------                        
-
-'       and a             a7
-'       and b             a0
-'       and c             a1
-'       and d             a2
-'       and e             a3
-'       and h             a4
-'       and l             a5
-'       and N             e6 N
-'       call NN           cd N  N
-'       cp b              b8
-'       cp c              b9
-'       cp d              ba
-'       cp e              bb
-'       cp h              bc
-'       cp l              bd
-'       cp (hl)           be
-'       cp (ix+N)         dd be N
-'       cp (iy+N)         fd be N
-'       cp a              bf
-'       cp N              fe N
-'       dec b             05       05    
-'       dec c             0d       13    +8
-'       dec d             15       21    +8
-'       dec e             1d       29    +8
-'       dec h             25       37    +8
-'       dec l             2d       45    +8
-'       dec (hl)          35       53    +8
-'       dec a             3d       61    +8
-'       dec (ix+N)        dd 35 N       
-'       dec (iy+N)        fd 35 N       
-'       dec bc            0b       11    +16
-'       dec de            1b       27    +16
-'       dec hl            2b       43    +16
-'       dec ix            dd 2b       
-'       dec iy            fd 2b       
-'       dec sp            3b       59    +16
-'       djnz $+2          10 DIST
-'       im 0              ed 46
-'       im 1              ed 56
-'       im 2              ed 5e
-'       inc b             04       04
-'       inc c             0c       12
-'       inc d             14       20
-'       inc e             1c       28
-'       inc h             24       36
-'       inc l             2c       44
-'       inc (hl)          34       52
-'       inc (ix+N)        dd 34 N
-'       inc (iy+N)        fd 34 N
-'       inc a             3c       60
-'       inc bc            03       03
-'       inc de            13       19
-'       inc hl            23       35
-'       inc ix            dd 23
-'       inc iy            fd 23
-'       inc sp            33       51
-'       jp $+3            c3
-'       jp (hl)           e9
-'       jp (ix)           dd e9
-'       jp (iy)           fd e9
-'       or b              b0
-'       or c              b1
-'       or d              b2
-'       or e              b3
-'       or h              b4
-'       or l              b5
-'       or (hl)           b6
-'       or (ix+N)         dd b6 N
-'       or (iy+N)         fd b6 N
-'       or a              b7
-'       or N              f6 N
-'       pop bc            c1
-'       pop de            d1
-'       pop hl            e1
-'       pop ix            dd e1
-'       pop iy            fd e1
-'       pop af            f1
-'       push bc           c5
-'       push de           d5
-'       push hl           e5
-'       push ix           dd e5
-'       push iy           fd e5
-'       push af           f5
-'       ret z             c8
-'       ret c             d8
-'       ret pe            e8
-'       ret m             f8
-'       ret nz            c0
-'       ret nc            d0
-'       ret po            e0
-'       ret p             f0
-'       rl  b             cb 10
-'       rl  c             cb 11
-'       rl  d             cb 12
-'       rl  e             cb 13
-'       rl  h             cb 14
-'       rl  l             cb 15
-'       rl  (hl)          cb 16
-'       rl (ix+N)         dd cb N  16
-'       rl (iy+N)         fd cb N  16
-'       rl  a             cb 17
-'       rlc b             cb 00
-'       rlc c             cb 01
-'       rlc d             cb 02
-'       rlc e             cb 03
-'       rlc h             cb 04
-'       rlc l             cb 05
-'       rlc (hl)          cb 06
-'       rlc (ix+N)        dd cb N  06
-'       rlc (iy+N)        fd cb N  06
-'       rlc a             cb 07
-'       rr  b             cb 18
-'       rr  c             cb 19
-'       rr  d             cb 1a
-'       rr  e             cb 1b
-'       rr  h             cb 1c
-'       rr  l             cb 1d
-'       rr  (hl)          cb 1e
-'       rr  a             cb 1f
-'       rr (ix+N)         dd cb N  1e
-'       rr (iy+N)         fd cb N  1e
-'       rrc (hl)          cb 0e
-'       rrc b             cb 08
-'       rrc c             cb 09
-'       rrc d             cb 0a
-'       rrc e             cb 0b
-'       rrc h             cb 0c
-'       rrc l             cb 0d
-'       rrc (ix+N)        dd cb N  0e
-'       rrc (iy+N)        fd cb N  0e
-'       rrc a             cb 0f
-'       rst 0             c7
-'       rst 8h            cf
-'       rst 10h           d7
-'       rst 18h           df
-'       rst 20h           e7
-'       rst 28h           ef
-'       rst 30h           f7
-'       rst 38h           ff
-'       sbc b             98
-'       sbc c             99
-'       sbc d             9a
-'       sbc e             9b
-'       sbc h             9c
-'       sbc l             9d
-'       sbc (hl)          9e
-'       sbc a             9f
-'       sla b             cb 20
-'       sla c             cb 21
-'       sla d             cb 22
-'       sla e             cb 23
-'       sla h             cb 24
-'       sla l             cb 25
-'       sla (hl)          cb 26
-'       sla (ix+N)        dd cb N  26
-'       sla (iy+N)        fd cb N  26
-'       sla a             cb 27
-'       sra b             cb 28
-'       sra c             cb 29
-'       sra d             cb 2a
-'       sra e             cb 2b
-'       sra h             cb 2c
-'       sra l             cb 2d
-'       sra (hl)          cb 2e
-'       sra (ix+N)        dd cb N  2e
-'       sra (iy+N)        fd cb N  2e
-'       sra a             cb 2f
-'       srl b             cb 38
-'       srl c             cb 39
-'       srl d             cb 3a
-'       srl e             cb 3b
-'       srl h             cb 3c
-'       srl l             cb 3d
-'       srl (hl)          cb 3e
-'       srl a             cb 3f
-'       sub b             90
-'       sub c             91
-'       sub d             92
-'       sub e             93
-'       sub h             94
-'       sub l             95
-'       sub (hl)          96
-'       sub (ix+N)        dd 96 N
-'       sub (iy+N)        fd 96 N
-'       sub a             97
-'       sub N             d6 N
-'       xor b             a8
-'       xor c             a9
-'       xor d             aa
-'       xor e             ab
-'       xor h             ac
-'       xor l             ad
-'       xor (hl)          ae
-'       xor (ix+N)        dd ae N
-'       xor (iy+N)        fd ae N
-'       xor a             af
-'       xor N             ee N
-
-
+'       jr z,No           28 No
+'       jr c,No           38 No
+'       jr nz,No          20 No
+'       jr nc,No          30 No
+'
+'       out (N),a         d3 N
+'       out (c),a         ed 79
+'       out (c),b         ed 41
+'       out (c),c         ed 49
+'       out (c),d         ed 51
+'       out (c),e         ed 59
+'       out (c),h         ed 61
+'       out (c),l         ed 69
+'
+'       sbc a,(ix+No)      dd 9e N
+'       sbc a,(iy+No)      fd 9e N
+'       sbc a,N           de N
+'
+'       sbc hl,bc         ed 42
+'       sbc hl,de         ed 52
+'       sbc hl,hl         ed 62
+'       sbc hl,sp         ed 72
+'
+' -----------------------------------------
+'
+'       bit 0,b           cb 40
+'       bit 0,c           cb 41
+'       bit 0,d           cb 42
+'       bit 0,e           cb 43
+'       bit 0,h           cb 44
+'       bit 0,l           cb 45
+'       bit 0,(hl)        cb 46
+'       bit 0,(ix+No)      dd cb N  46
+'       bit 0,(iy+No)      fd cb N  46
+'       bit 0,a           cb 47
+'       bit 1,b           cb 48
+'       bit 1,c           cb 49
+'       bit 1,d           cb 4a
+'       bit 1,e           cb 4b
+'       bit 1,h           cb 4c
+'       bit 1,l           cb 4d
+'       bit 1,(hl)        cb 4e
+'       bit 1,(ix+No)      dd cb N  4e
+'       bit 1,(iy+No)      fd cb N  4e
+'       bit 1,a           cb 4f
+'       bit 2,b           cb 50
+'       bit 2,c           cb 51
+'       bit 2,d           cb 52
+'       bit 2,e           cb 53
+'       bit 2,h           cb 54
+'       bit 2,l           cb 55
+'       bit 2,(hl)        cb 56
+'       bit 2,(ix+No)      dd cb N  56
+'       bit 2,(iy+No)      fd cb N  56
+'       bit 2,a           cb 57
+'       bit 3,b           cb 58
+'       bit 3,c           cb 59
+'       bit 3,d           cb 5a
+'       bit 3,e           cb 5b
+'       bit 3,h           cb 5c
+'       bit 3,l           cb 5d
+'       bit 3,(hl)        cb 5e
+'       bit 3,(ix+No)      dd cb N  5e
+'       bit 3,(iy+No)      fd cb N  5e
+'       bit 3,a           cb 5f
+'       bit 4,b           cb 60
+'       bit 4,c           cb 61
+'       bit 4,d           cb 62
+'       bit 4,e           cb 63
+'       bit 4,h           cb 64
+'       bit 4,l           cb 65
+'       bit 4,(hl)        cb 66
+'       bit 4,(ix+No)      dd cb N  66
+'       bit 4,(iy+No)      fd cb N  66
+'       bit 4,a           cb 67
+'       bit 5,b           cb 68
+'       bit 5,c           cb 69
+'       bit 5,d           cb 6a
+'       bit 5,e           cb 6b
+'       bit 5,h           cb 6c
+'       bit 5,l           cb 6d
+'       bit 5,(hl)        cb 6e
+'       bit 5,(ix+No)      dd cb N  6e
+'       bit 5,(iy+No)      fd cb N  6e
+'       bit 5,a           cb 6f
+'       bit 6,b           cb 70
+'       bit 6,c           cb 71
+'       bit 6,d           cb 72
+'       bit 6,e           cb 73
+'       bit 6,h           cb 74
+'       bit 6,l           cb 75
+'       bit 6,(hl)        cb 76
+'       bit 6,(ix+No)      dd cb N  76
+'       bit 6,(iy+No)      fd cb N  76
+'       bit 6,a           cb 77
+'       bit 7,b           cb 78
+'       bit 7,c           cb 79
+'       bit 7,d           cb 7a
+'       bit 7,e           cb 7b
+'       bit 7,h           cb 7c
+'       bit 7,l           cb 7d
+'       bit 7,(hl)        cb 7e
+'       bit 7,(ix+No)      dd cb N  7e
+'       bit 7,(iy+No)      fd cb N  7e
+'       bit 7,a           cb 7f
+'
+'       res 0,(hl)        cb 86
+'       res 0,(ix+No)      dd cb N  86
+'       res 0,(iy+No)      fd cb N  86
+'       res 0,a           cb 87
+'       res 0,b           cb 80
+'       res 0,c           cb 81
+'       res 0,d           cb 82
+'       res 0,e           cb 83
+'       res 0,h           cb 84
+'       res 0,l           cb 85
+'       res 1,(hl)        cb 8e
+'       res 1,(ix+No)      dd cb N  8e
+'       res 1,(iy+No)      fd cb N  8e
+'       res 1,a           cb 8f
+'       res 1,b           cb 88
+'       res 1,c           cb 89
+'       res 1,d           cb 8a
+'       res 1,e           cb 8b
+'       res 1,h           cb 8c
+'       res 1,l           cb 8d
+'       res 2,(hl)        cb 96
+'       res 2,(ix+No)      dd cb N  96
+'       res 2,(iy+No)      fd cb N  96
+'       res 2,a           cb 97
+'       res 2,b           cb 90
+'       res 2,c           cb 91
+'       res 2,d           cb 92
+'       res 2,e           cb 93
+'       res 2,h           cb 94
+'       res 2,l           cb 95
+'       res 3,(hl)        cb 9e
+'       res 3,(ix+No)      dd cb N  9e
+'       res 3,(iy+No)      fd cb N  9e
+'       res 3,a           cb 9f
+'       res 3,b           cb 98
+'       res 3,c           cb 99
+'       res 3,d           cb 9a
+'       res 3,e           cb 9b
+'       res 3,h           cb 9c
+'       res 3,l           cb 9d
+'       res 4,(hl)        cb a6
+'       res 4,(ix+No)      dd cb N  a6
+'       res 4,(iy+No)      fd cb N  a6
+'       res 4,a           cb a7
+'       res 4,b           cb a0
+'       res 4,c           cb a1
+'       res 4,d           cb a2
+'       res 4,e           cb a3
+'       res 4,h           cb a4
+'       res 4,l           cb a5
+'       res 5,(hl)        cb ae
+'       res 5,(ix+No)      dd cb N  ae
+'       res 5,(iy+No)      fd cb N  ae
+'       res 5,a           cb af
+'       res 5,b           cb a8
+'       res 5,c           cb a9
+'       res 5,d           cb aa
+'       res 5,e           cb ab
+'       res 5,h           cb ac
+'       res 5,l           cb ad
+'       res 6,(hl)        cb b6
+'       res 6,(ix+No)      dd cb N  b6
+'       res 6,(iy+No)      fd cb N  b6
+'       res 6,a           cb b7
+'       res 6,b           cb b0
+'       res 6,c           cb b1
+'       res 6,d           cb b2
+'       res 6,e           cb b3
+'       res 6,h           cb b4
+'       res 6,l           cb b5
+'       res 7,(hl)        cb be
+'       res 7,(ix+No)      dd cb N  be
+'       res 7,(iy+No)      fd cb N  be
+'       res 7,a           cb bf
+'       res 7,b           cb b8
+'       res 7,c           cb b9
+'       res 7,d           cb ba
+'       res 7,e           cb bb
+'       res 7,h           cb bc
+'       res 7,l           cb bd
+'
+'       set 0,(hl)        cb c6
+'       set 0,(ix+No)      dd cb N  c6
+'       set 0,(iy+No)      fd cb N  c6
+'       set 0,a           cb c7
+'       set 0,b           cb c0
+'       set 0,c           cb c1
+'       set 0,d           cb c2
+'       set 0,e           cb c3
+'       set 0,h           cb c4
+'       set 0,l           cb c5
+'       set 1,(hl)        cb ce
+'       set 1,(ix+No)      dd cb N  ce
+'       set 1,(iy+No)      fd cb N  ce
+'       set 1,a           cb cf
+'       set 1,b           cb c8
+'       set 1,c           cb c9
+'       set 1,d           cb ca
+'       set 1,e           cb cb
+'       set 1,h           cb cc
+'       set 1,l           cb cd
+'       set 2,(hl)        cb d6
+'       set 2,(ix+No)      dd cb N  d6
+'       set 2,(iy+No)      fd cb N  d6
+'       set 2,a           cb d7
+'       set 2,b           cb d0
+'       set 2,c           cb d1
+'       set 2,d           cb d2
+'       set 2,e           cb d3
+'       set 2,h           cb d4
+'       set 2,l           cb d5
+'       set 3,(hl)        cb de
+'       set 3,(ix+No)      dd cb N  de
+'       set 3,(iy+No)      fd cb N  de
+'       set 3,a           cb df
+'       set 3,b           cb d8
+'       set 3,c           cb d9
+'       set 3,d           cb da
+'       set 3,e           cb db
+'       set 3,h           cb dc
+'       set 3,l           cb dd
+'       set 4,(hl)        cb e6
+'       set 4,(ix+No)      dd cb N  e6
+'       set 4,(iy+No)      fd cb N  e6
+'       set 4,a           cb e7
+'       set 4,b           cb e0
+'       set 4,c           cb e1
+'       set 4,d           cb e2
+'       set 4,e           cb e3
+'       set 4,h           cb e4
+'       set 4,l           cb e5
+'       set 5,(hl)        cb ee
+'       set 5,(ix+No)      dd cb N  ee
+'       set 5,(iy+No)      fd cb N  ee
+'       set 5,a           cb ef
+'       set 5,b           cb e8
+'       set 5,c           cb e9
+'       set 5,d           cb ea
+'       set 5,e           cb eb
+'       set 5,h           cb ec
+'       set 5,l           cb ed
+'       set 6,(hl)        cb f6
+'       set 6,(ix+No)      dd cb N  f6
+'       set 6,(iy+No)      fd cb N  f6
+'       set 6,a           cb f7
+'       set 6,b           cb f0
+'       set 6,c           cb f1
+'       set 6,d           cb f2
+'       set 6,e           cb f3
+'       set 6,h           cb f4
+'       set 6,l           cb f5
+'       set 7,(hl)        cb fe
+'       set 7,(ix+No)      dd cb N  fe
+'       set 7,(iy+No)      fd cb N  fe
+'       set 7,a           cb ff
+'       set 7,b           cb f8
+'       set 7,c           cb f9
+'       set 7,d           cb fa
+'       set 7,e           cb fb
+'       set 7,h           cb fc
+'       set 7,l           cb fd
+'
+'
 '----- Pattern Search  -----------------------------------------------                        
 
 'order
@@ -566,15 +956,15 @@ e        ?B
 h        ?C
 l        ?D
 (hl)     ?E
-(ix+N)   DD ?E N
-(iy+N)   FD ?E N
+(ix+No)   DD ?E N
+(iy+No)   FD ?E N
 a        ?F
 
 '"add",128,50,"add",9,149 "and",160,48
                                               
 '   add a,(hl)   86        and (hl)   a6        
-'   add a,(ix+N) dd 86 N   and (ix+N) dd a6 N   
-'   add a,(iy+N) fd 86 N   and (iy+N) fd a6 N   
+'   add a,(ix+No) dd 86 N   and (ix+No) dd a6 N   
+'   add a,(iy+No) fd 86 N   and (iy+No) fd a6 N   
 '   add a,a      87        and a      a7        
 '   add a,b      80        and b      a0        
 '   add a,c      81        and c      a1        
@@ -585,8 +975,8 @@ a        ?F
 '   add a,N      c6 N      and N      e6 N      
 
 '   cp (hl)   be           dec (hl)   35     
-'   cp (ix+N) dd be N      dec (ix+N) dd 35 N
-'   cp (iy+N) fd be N      dec (iy+N) fd 35 N
+'   cp (ix+No) dd be N      dec (ix+No) dd 35 N
+'   cp (iy+No) fd be N      dec (iy+No) fd 35 N
 '   cp a      bf           dec a      3d     
 '   cp b      b8           dec b      05       dec bc     0b
 '   cp c      b9           dec c      0d       
@@ -603,8 +993,8 @@ a        ?F
 '----- Full List -----------------------------------------------                        
 '                          
 '       adc a,(hl)        8e
-'       adc a,(ix+N)      dd 8e N
-'       adc a,(iy+N)      fd 8e N
+'       adc a,(ix+No)      dd 8e N
+'       adc a,(iy+No)      fd 8e N
 '       adc a,a           8f
 '       adc a,b           88
 '       adc a,c           89
@@ -618,8 +1008,8 @@ a        ?F
 '       adc hl,hl         ed 6a
 '       adc hl,sp         ed 7a
 '       add a,(hl)        86
-'       add a,(ix+N)      dd 86 N
-'       add a,(iy+N)      fd 86 N
+'       add a,(ix+No)      dd 86 N
+'       add a,(iy+No)      fd 86 N
 '       add a,a           87
 '       add a,b           80
 '       add a,c           81
@@ -641,8 +1031,8 @@ a        ?F
 '       add iy,iy         fd 29
 '       add iy,sp         fd 39
 '       and (hl)          a6
-'       and (ix+N)        dd a6 N
-'       and (iy+N)        fd a6 N
+'       and (ix+No)        dd a6 N
+'       and (iy+No)        fd a6 N
 '       and a             a7
 '       and b             a0
 '       and c             a1
@@ -652,8 +1042,8 @@ a        ?F
 '       and l             a5
 '       and N             e6 N
 '       bit 0,(hl)        cb 46
-'       bit 0,(ix+N)      dd cb N  46
-'       bit 0,(iy+N)      fd cb N  46
+'       bit 0,(ix+No)      dd cb N  46
+'       bit 0,(iy+No)      fd cb N  46
 '       bit 0,a           cb 47
 '       bit 0,b           cb 40
 '       bit 0,c           cb 41
@@ -662,8 +1052,8 @@ a        ?F
 '       bit 0,h           cb 44
 '       bit 0,l           cb 45
 '       bit 1,(hl)        cb 4e
-'       bit 1,(ix+N)      dd cb N  4e
-'       bit 1,(iy+N)      fd cb N  4e
+'       bit 1,(ix+No)      dd cb N  4e
+'       bit 1,(iy+No)      fd cb N  4e
 '       bit 1,a           cb 4f
 '       bit 1,b           cb 48
 '       bit 1,c           cb 49
@@ -672,8 +1062,8 @@ a        ?F
 '       bit 1,h           cb 4c
 '       bit 1,l           cb 4d
 '       bit 2,(hl)        cb 56
-'       bit 2,(ix+N)      dd cb N  56
-'       bit 2,(iy+N)      fd cb N  56
+'       bit 2,(ix+No)      dd cb N  56
+'       bit 2,(iy+No)      fd cb N  56
 '       bit 2,a           cb 57
 '       bit 2,b           cb 50
 '       bit 2,c           cb 51
@@ -682,8 +1072,8 @@ a        ?F
 '       bit 2,h           cb 54
 '       bit 2,l           cb 55
 '       bit 3,(hl)        cb 5e
-'       bit 3,(ix+N)      dd cb N  5e
-'       bit 3,(iy+N)      fd cb N  5e
+'       bit 3,(ix+No)      dd cb N  5e
+'       bit 3,(iy+No)      fd cb N  5e
 '       bit 3,a           cb 5f
 '       bit 3,b           cb 58
 '       bit 3,c           cb 59
@@ -692,8 +1082,8 @@ a        ?F
 '       bit 3,h           cb 5c
 '       bit 3,l           cb 5d
 '       bit 4,(hl)        cb 66
-'       bit 4,(ix+N)      dd cb N  66
-'       bit 4,(iy+N)      fd cb N  66
+'       bit 4,(ix+No)      dd cb N  66
+'       bit 4,(iy+No)      fd cb N  66
 '       bit 4,a           cb 67
 '       bit 4,b           cb 60
 '       bit 4,c           cb 61
@@ -702,8 +1092,8 @@ a        ?F
 '       bit 4,h           cb 64
 '       bit 4,l           cb 65
 '       bit 5,(hl)        cb 6e
-'       bit 5,(ix+N)      dd cb N  6e
-'       bit 5,(iy+N)      fd cb N  6e
+'       bit 5,(ix+No)      dd cb N  6e
+'       bit 5,(iy+No)      fd cb N  6e
 '       bit 5,a           cb 6f
 '       bit 5,b           cb 68
 '       bit 5,c           cb 69
@@ -712,8 +1102,8 @@ a        ?F
 '       bit 5,h           cb 6c
 '       bit 5,l           cb 6d
 '       bit 6,(hl)        cb 76
-'       bit 6,(ix+N)      dd cb N  76
-'       bit 6,(iy+N)      fd cb N  76
+'       bit 6,(ix+No)      dd cb N  76
+'       bit 6,(iy+No)      fd cb N  76
 '       bit 6,a           cb 77
 '       bit 6,b           cb 70
 '       bit 6,c           cb 71
@@ -722,8 +1112,8 @@ a        ?F
 '       bit 6,h           cb 74
 '       bit 6,l           cb 75
 '       bit 7,(hl)        cb 7e
-'       bit 7,(ix+N)      dd cb N  7e
-'       bit 7,(iy+N)      fd cb N  7e
+'       bit 7,(ix+No)      dd cb N  7e
+'       bit 7,(iy+No)      fd cb N  7e
 '       bit 7,a           cb 7f
 '       bit 7,b           cb 78
 '       bit 7,c           cb 79
@@ -743,8 +1133,8 @@ a        ?F
 '       call z,NN         cc N  N
 '       ccf               3f
 '       cp (hl)           be
-'       cp (ix+N)         dd be N
-'       cp (iy+N)         fd be N
+'       cp (ix+No)         dd be N
+'       cp (iy+No)         fd be N
 '       cp a              bf
 '       cp b              b8
 '       cp c              b9
@@ -760,8 +1150,8 @@ a        ?F
 '       cpl               2f
 '       daa               27
 '       dec (hl)          35
-'       dec (ix+N)        dd 35 N
-'       dec (iy+N)        fd 35 N
+'       dec (ix+No)        dd 35 N
+'       dec (iy+No)        fd 35 N
 '       dec a             3d
 '       dec b             05
 '       dec bc            0b
@@ -776,7 +1166,7 @@ a        ?F
 '       dec l             2d
 '       dec sp            3b
 '       di                f3
-'       djnz $+2          10
+'       djnz No           10 No
 '       ei                fb
 '       ex (sp),hl        e3
 '       ex (sp),ix        dd e3
@@ -797,8 +1187,8 @@ a        ?F
 '       in h,(c)          ed 60
 '       in l,(c)          ed 68
 '       inc (hl)          34
-'       inc (ix+N)        dd 34 N
-'       inc (iy+N)        fd 34 N
+'       inc (ix+No)        dd 34 N
+'       inc (iy+No)        fd 34 N
 '       inc a             3c
 '       inc b             04
 '       inc bc            03
@@ -816,23 +1206,23 @@ a        ?F
 '       indr              ed ba
 '       ini               ed a2
 '       inir              ed b2
-'       jp $+3            c3
+'       jp N N            c3 N N
 '       jp (hl)           e9
 '       jp (ix)           dd e9
 '       jp (iy)           fd e9
-'       jp c,$+3          da
-'       jp m,$+3          fa
-'       jp nc,$+3         d2
-'       jp nz,$+3         c2
-'       jp p,$+3          f2
-'       jp pe,$+3         ea
-'       jp po,$+3         e2
-'       jp z,$+3          ca
-'       jr $+2            18
-'       jr c,$+2          38
-'       jr nc,$+2         30
-'       jr nz,$+2         20
-'       jr z,$+2          28
+'       jp c,N N          da N N
+'       jp m, N N         fa N N
+'       jp nc,N N         d2 N N
+'       jp nz,N N         c2 N N
+'       jp p, N N         f2 N N
+'       jp pe,N N         ea N N
+'       jp po,N N         e2 N N
+'       jp z, N N         ca N N
+'       jr No             18 No
+'       jr c,$+2          38 No
+'       jr nc,$+2         30 No
+'       jr nz,$+2         20 No
+'       jr z,$+2          28 No
 '       ld (bc),a         02
 '       ld (de),a         12
 '       ld (hl),a         77
@@ -843,22 +1233,22 @@ a        ?F
 '       ld (hl),h         74
 '       ld (hl),l         75
 '       ld (hl),N         36 N
-'       ld (ix+N),a       dd 77 N
-'       ld (ix+N),b       dd 70 N
-'       ld (ix+N),c       dd 71 N
-'       ld (ix+N),d       dd 72 N
-'       ld (ix+N),e       dd 73 N
-'       ld (ix+N),h       dd 74 N
-'       ld (ix+N),l       dd 75 N
-'       ld (ix+N),N       dd 36 N  N
-'       ld (iy+N),a       fd 77 N
-'       ld (iy+N),b       fd 70 N
-'       ld (iy+N),c       fd 71 N
-'       ld (iy+N),d       fd 72 N
-'       ld (iy+N),e       fd 73 N
-'       ld (iy+N),h       fd 74 N
-'       ld (iy+N),l       fd 75 N
-'       ld (iy+N),N       fd 36 N  N
+'       ld (ix+No),a       dd 77 N
+'       ld (ix+No),b       dd 70 N
+'       ld (ix+No),c       dd 71 N
+'       ld (ix+No),d       dd 72 N
+'       ld (ix+No),e       dd 73 N
+'       ld (ix+No),h       dd 74 N
+'       ld (ix+No),l       dd 75 N
+'       ld (ix+No),N       dd 36 N  N
+'       ld (iy+No),a       fd 77 N
+'       ld (iy+No),b       fd 70 N
+'       ld (iy+No),c       fd 71 N
+'       ld (iy+No),d       fd 72 N
+'       ld (iy+No),e       fd 73 N
+'       ld (iy+No),h       fd 74 N
+'       ld (iy+No),l       fd 75 N
+'       ld (iy+No),N       fd 36 N  N
 '       ld (NN),a         32 N  N
 '       ld (NN),bc        ed 43 N  N
 '       ld (NN),de        ed 53 N  N
@@ -869,8 +1259,8 @@ a        ?F
 '       ld a,(bc)         0a
 '       ld a,(de)         1a
 '       ld a,(hl)         7e
-'       ld a,(ix+N)       dd 7e N
-'       ld a,(iy+N)       fd 7e N
+'       ld a,(ix+No)       dd 7e N
+'       ld a,(iy+No)       fd 7e N
 '       ld a,(NN)         3a N  N
 '       ld a,a            7f
 '       ld a,b            78
@@ -882,8 +1272,8 @@ a        ?F
 '       ld a,l            7d
 '       ld a,N            3e N
 '       ld b,(hl)         46
-'       ld b,(ix+N)       dd 46 N
-'       ld b,(iy+N)       fd 46 N
+'       ld b,(ix+No)       dd 46 N
+'       ld b,(iy+No)       fd 46 N
 '       ld b,a            47
 '       ld b,b            40
 '       ld b,c            41
@@ -895,8 +1285,8 @@ a        ?F
 '       ld bc,(NN)        ed 4b N  N
 '       ld bc,NN          01 N  N
 '       ld c,(hl)         4e
-'       ld c,(ix+N)       dd 4e N
-'       ld c,(iy+N)       fd 4e N
+'       ld c,(ix+No)       dd 4e N
+'       ld c,(iy+No)       fd 4e N
 '       ld c,a            4f
 '       ld c,b            48
 '       ld c,c            49
@@ -906,8 +1296,8 @@ a        ?F
 '       ld c,l            4d
 '       ld c,N            0e N
 '       ld d,(hl)         56
-'       ld d,(ix+N)       dd 56 N
-'       ld d,(iy+N)       fd 56 N
+'       ld d,(ix+No)       dd 56 N
+'       ld d,(iy+No)       fd 56 N
 '       ld d,a            57
 '       ld d,b            50
 '       ld d,c            51
@@ -919,8 +1309,8 @@ a        ?F
 '       ld de,(NN)        ed 5b N  N
 '       ld de,NN          11 N  N
 '       ld e,(hl)         5e
-'       ld e,(ix+N)       dd 5e N
-'       ld e,(iy+N)       fd 5e N
+'       ld e,(ix+No)       dd 5e N
+'       ld e,(iy+No)       fd 5e N
 '       ld e,a            5f
 '       ld e,b            58
 '       ld e,c            59
@@ -930,8 +1320,8 @@ a        ?F
 '       ld e,l            5d
 '       ld e,N            1e N
 '       ld h,(hl)         66
-'       ld h,(ix+N)       dd 66 N
-'       ld h,(iy+N)       fd 66 N
+'       ld h,(ix+No)       dd 66 N
+'       ld h,(iy+No)       fd 66 N
 '       ld h,a            67
 '       ld h,b            60
 '       ld h,c            61
@@ -948,8 +1338,8 @@ a        ?F
 '       ld iy,(NN)        fd 2a N  N
 '       ld iy,NN          fd 21 N  N
 '       ld l,(hl)         6e
-'       ld l,(ix+N)       dd 6e N
-'       ld l,(iy+N)       fd 6e N
+'       ld l,(ix+No)       dd 6e N
+'       ld l,(iy+No)       fd 6e N
 '       ld l,a            6f
 '       ld l,b            68
 '       ld l,c            69
@@ -970,8 +1360,8 @@ a        ?F
 '       neg               ed 44
 '       nop               00
 '       or (hl)           b6
-'       or (ix+N)         dd b6 N
-'       or (iy+N)         fd b6 N
+'       or (ix+No)         dd b6 N
+'       or (iy+No)         fd b6 N
 '       or a              b7
 '       or b              b0
 '       or c              b1
@@ -1004,86 +1394,6 @@ a        ?F
 '       push hl           e5
 '       push ix           dd e5
 '       push iy           fd e5
-'       res 0,(hl)        cb 86
-'       res 0,(ix+N)      dd cb N  86
-'       res 0,(iy+N)      fd cb N  86
-'       res 0,a           cb 87
-'       res 0,b           cb 80
-'       res 0,c           cb 81
-'       res 0,d           cb 82
-'       res 0,e           cb 83
-'       res 0,h           cb 84
-'       res 0,l           cb 85
-'       res 1,(hl)        cb 8e
-'       res 1,(ix+N)      dd cb N  8e
-'       res 1,(iy+N)      fd cb N  8e
-'       res 1,a           cb 8f
-'       res 1,b           cb 88
-'       res 1,c           cb 89
-'       res 1,d           cb 8a
-'       res 1,e           cb 8b
-'       res 1,h           cb 8c
-'       res 1,l           cb 8d
-'       res 2,(hl)        cb 96
-'       res 2,(ix+N)      dd cb N  96
-'       res 2,(iy+N)      fd cb N  96
-'       res 2,a           cb 97
-'       res 2,b           cb 90
-'       res 2,c           cb 91
-'       res 2,d           cb 92
-'       res 2,e           cb 93
-'       res 2,h           cb 94
-'       res 2,l           cb 95
-'       res 3,(hl)        cb 9e
-'       res 3,(ix+N)      dd cb N  9e
-'       res 3,(iy+N)      fd cb N  9e
-'       res 3,a           cb 9f
-'       res 3,b           cb 98
-'       res 3,c           cb 99
-'       res 3,d           cb 9a
-'       res 3,e           cb 9b
-'       res 3,h           cb 9c
-'       res 3,l           cb 9d
-'       res 4,(hl)        cb a6
-'       res 4,(ix+N)      dd cb N  a6
-'       res 4,(iy+N)      fd cb N  a6
-'       res 4,a           cb a7
-'       res 4,b           cb a0
-'       res 4,c           cb a1
-'       res 4,d           cb a2
-'       res 4,e           cb a3
-'       res 4,h           cb a4
-'       res 4,l           cb a5
-'       res 5,(hl)        cb ae
-'       res 5,(ix+N)      dd cb N  ae
-'       res 5,(iy+N)      fd cb N  ae
-'       res 5,a           cb af
-'       res 5,b           cb a8
-'       res 5,c           cb a9
-'       res 5,d           cb aa
-'       res 5,e           cb ab
-'       res 5,h           cb ac
-'       res 5,l           cb ad
-'       res 6,(hl)        cb b6
-'       res 6,(ix+N)      dd cb N  b6
-'       res 6,(iy+N)      fd cb N  b6
-'       res 6,a           cb b7
-'       res 6,b           cb b0
-'       res 6,c           cb b1
-'       res 6,d           cb b2
-'       res 6,e           cb b3
-'       res 6,h           cb b4
-'       res 6,l           cb b5
-'       res 7,(hl)        cb be
-'       res 7,(ix+N)      dd cb N  be
-'       res 7,(iy+N)      fd cb N  be
-'       res 7,a           cb bf
-'       res 7,b           cb b8
-'       res 7,c           cb b9
-'       res 7,d           cb ba
-'       res 7,e           cb bb
-'       res 7,h           cb bc
-'       res 7,l           cb bd
 '       ret               c9
 '       ret c             d8
 '       ret m             f8
@@ -1103,12 +1413,12 @@ a        ?F
 '       rl  e             cb 13
 '       rl  h             cb 14
 '       rl  l             cb 15
-'       rl (ix+N)         dd cb N  16
-'       rl (iy+N)         fd cb N  16
+'       rl (ix+No)         dd cb N  16
+'       rl (iy+No)         fd cb N  16
 '       rla               17
 '       rlc (hl)          cb 06
-'       rlc (ix+N)        dd cb N  06
-'       rlc (iy+N)        fd cb N  06
+'       rlc (ix+No)        dd cb N  06
+'       rlc (iy+No)        fd cb N  06
 '       rlc a             cb 07
 '       rlc b             cb 00
 '       rlc c             cb 01
@@ -1126,12 +1436,12 @@ a        ?F
 '       rr  e             cb 1b
 '       rr  h             cb 1c
 '       rr  l             cb 1d
-'       rr (ix+N)         dd cb N  1e
-'       rr (iy+N)         fd cb N  1e
+'       rr (ix+No)         dd cb N  1e
+'       rr (iy+No)         fd cb N  1e
 '       rra               1f
 '       rrc (hl)          cb 0e
-'       rrc (ix+N)        dd cb N  0e
-'       rrc (iy+N)        fd cb N  0e
+'       rrc (ix+No)        dd cb N  0e
+'       rrc (iy+No)        fd cb N  0e
 '       rrc a             cb 0f
 '       rrc b             cb 08
 '       rrc c             cb 09
@@ -1151,8 +1461,8 @@ a        ?F
 '       rst 8h            cf
 '       sbc (hl)          9e
 '       sbc a             9f
-'       sbc a,(ix+N)      dd 9e N
-'       sbc a,(iy+N)      fd 9e N
+'       sbc a,(ix+No)      dd 9e N
+'       sbc a,(iy+No)      fd 9e N
 '       sbc a,N           de N
 '       sbc b             98
 '       sbc c             99
@@ -1166,8 +1476,8 @@ a        ?F
 '       sbc l             9d
 '       scf               37
 '       set 0,(hl)        cb c6
-'       set 0,(ix+N)      dd cb N  c6
-'       set 0,(iy+N)      fd cb N  c6
+'       set 0,(ix+No)      dd cb N  c6
+'       set 0,(iy+No)      fd cb N  c6
 '       set 0,a           cb c7
 '       set 0,b           cb c0
 '       set 0,c           cb c1
@@ -1176,8 +1486,8 @@ a        ?F
 '       set 0,h           cb c4
 '       set 0,l           cb c5
 '       set 1,(hl)        cb ce
-'       set 1,(ix+N)      dd cb N  ce
-'       set 1,(iy+N)      fd cb N  ce
+'       set 1,(ix+No)      dd cb N  ce
+'       set 1,(iy+No)      fd cb N  ce
 '       set 1,a           cb cf
 '       set 1,b           cb c8
 '       set 1,c           cb c9
@@ -1186,8 +1496,8 @@ a        ?F
 '       set 1,h           cb cc
 '       set 1,l           cb cd
 '       set 2,(hl)        cb d6
-'       set 2,(ix+N)      dd cb N  d6
-'       set 2,(iy+N)      fd cb N  d6
+'       set 2,(ix+No)      dd cb N  d6
+'       set 2,(iy+No)      fd cb N  d6
 '       set 2,a           cb d7
 '       set 2,b           cb d0
 '       set 2,c           cb d1
@@ -1196,8 +1506,8 @@ a        ?F
 '       set 2,h           cb d4
 '       set 2,l           cb d5
 '       set 3,(hl)        cb de
-'       set 3,(ix+N)      dd cb N  de
-'       set 3,(iy+N)      fd cb N  de
+'       set 3,(ix+No)      dd cb N  de
+'       set 3,(iy+No)      fd cb N  de
 '       set 3,a           cb df
 '       set 3,b           cb d8
 '       set 3,c           cb d9
@@ -1206,8 +1516,8 @@ a        ?F
 '       set 3,h           cb dc
 '       set 3,l           cb dd
 '       set 4,(hl)        cb e6
-'       set 4,(ix+N)      dd cb N  e6
-'       set 4,(iy+N)      fd cb N  e6
+'       set 4,(ix+No)      dd cb N  e6
+'       set 4,(iy+No)      fd cb N  e6
 '       set 4,a           cb e7
 '       set 4,b           cb e0
 '       set 4,c           cb e1
@@ -1216,8 +1526,8 @@ a        ?F
 '       set 4,h           cb e4
 '       set 4,l           cb e5
 '       set 5,(hl)        cb ee
-'       set 5,(ix+N)      dd cb N  ee
-'       set 5,(iy+N)      fd cb N  ee
+'       set 5,(ix+No)      dd cb N  ee
+'       set 5,(iy+No)      fd cb N  ee
 '       set 5,a           cb ef
 '       set 5,b           cb e8
 '       set 5,c           cb e9
@@ -1226,8 +1536,8 @@ a        ?F
 '       set 5,h           cb ec
 '       set 5,l           cb ed
 '       set 6,(hl)        cb f6
-'       set 6,(ix+N)      dd cb N  f6
-'       set 6,(iy+N)      fd cb N  f6
+'       set 6,(ix+No)      dd cb N  f6
+'       set 6,(iy+No)      fd cb N  f6
 '       set 6,a           cb f7
 '       set 6,b           cb f0
 '       set 6,c           cb f1
@@ -1236,8 +1546,8 @@ a        ?F
 '       set 6,h           cb f4
 '       set 6,l           cb f5
 '       set 7,(hl)        cb fe
-'       set 7,(ix+N)      dd cb N  fe
-'       set 7,(iy+N)      fd cb N  fe
+'       set 7,(ix+No)      dd cb N  fe
+'       set 7,(iy+No)      fd cb N  fe
 '       set 7,a           cb ff
 '       set 7,b           cb f8
 '       set 7,c           cb f9
@@ -1246,8 +1556,8 @@ a        ?F
 '       set 7,h           cb fc
 '       set 7,l           cb fd
 '       sla (hl)          cb 26
-'       sla (ix+N)        dd cb N  26
-'       sla (iy+N)        fd cb N  26
+'       sla (ix+No)        dd cb N  26
+'       sla (iy+No)        fd cb N  26
 '       sla a             cb 27
 '       sla b             cb 20
 '       sla c             cb 21
@@ -1256,8 +1566,8 @@ a        ?F
 '       sla h             cb 24
 '       sla l             cb 25
 '       sra (hl)          cb 2e
-'       sra (ix+N)        dd cb N  2e
-'       sra (iy+N)        fd cb N  2e
+'       sra (ix+No)        dd cb N  2e
+'       sra (iy+No)        fd cb N  2e
 '       sra a             cb 2f
 '       sra b             cb 28
 '       sra c             cb 29
@@ -1274,8 +1584,8 @@ a        ?F
 '       srl h             cb 3c
 '       srl l             cb 3d
 '       sub (hl)          96
-'       sub (ix+N)        dd 96 N
-'       sub (iy+N)        fd 96 N
+'       sub (ix+No)        dd 96 N
+'       sub (iy+No)        fd 96 N
 '       sub a             97
 '       sub b             90
 '       sub c             91
@@ -1285,8 +1595,8 @@ a        ?F
 '       sub l             95
 '       sub N             d6 N
 '       xor (hl)          ae
-'       xor (ix+N)        dd ae N
-'       xor (iy+N)        fd ae N
+'       xor (ix+No)        dd ae N
+'       xor (iy+No)        fd ae N
 '       xor a             af
 '       xor b             a8
 '       xor c             a9
