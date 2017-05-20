@@ -26,24 +26,30 @@
 28 REM       ld (@32113),hl
 29 REM      $end$
 
-35 REM --------------------------------------------------------------
-36 REM   temp variables are i,j,k,x$,x,y$,y
+30 REM Assumptions on code format
+31 REM  - [label] [opcode] [operand] [comment]
+32 REM  - fields are seperated by at least one space
+33 REM  - if no label then opcode must be preceeded by a space
+34 REM  - the operand must not contain spaces
+35 REM  - labels prefixed by '!'
+36 REM  - numbers prefixed by '@' and must be decimal
+
 37 REM --------------------------------------------------------------
+38 REM   temp variables are i,j,k,x$,x,y$,y
+39 REM --------------------------------------------------------------
+ 
+40 LET maxLabels=5: LET maxLines=20
 
-38 REM max labels, lines
-39 LET maxLabels=5: LET maxLines=20
+41 REM label, length, position
+42 DIM l$(maxLabels,5): DIM l(maxLabels): DIM p(maxLabels)
 
-40 REM label, length, position
-41 DIM l$(maxLabels,5): DIM l(maxLabels): DIM p(maxLabels)
+43 REM opcode, length
+44 DIM m$(maxLines,5): DIM m(maxLines)
 
-42 REM opcode, length
-43 DIM m$(maxLines,5): DIM m(maxLines)
+45 REM operand arg1, length, arg2, length
+46 DIM n$(maxLines,10): DIM n(maxLines): DIM o$(maxLines,10): DIM o(maxLines)
 
-44 REM operand arg1, length, arg2, length
-45 DIM n$(maxLines,10): DIM n(maxLines): DIM o$(maxLines,10): DIM o(maxLines)
-
-46 REM line count, label total
-47 LET lc=1: LET lt=1
+47 LET lc=1: LET lt=1: REM line count, label total
 
 50 REM --- pass 1 ----------------------------------------------------------------------------
 51 LET codeLoc=(PEEK 23635+(256*PEEK 23636))+5: REM get start location of REM lines
@@ -93,29 +99,38 @@
 
 205 REM GOSUB sDebug1
 
-210 REM max opcodes0, opcode, v1, v2, v3, byte count, hex display
-211 LET max0=21: DIM t$(max0,4): DIM t(max0): DIM u(max0): DIM v(max0): DIM w(max0): DIM w$(max0,8)
-212 FOR i=1 TO max0: READ t$(i), t(i), u(i), v(i), w(i), w$(i): NEXT i
-214 DATA "ccf ",63,0,0,1,"3f   ","cpd ",237,169,0,2,"ed a9","cpdr",237,185,0,2,"ed b9","cpi ",237,161,0,2,"ed a1","cpir",237,177,0,2,"ed b1","cpl ",47,0,0,1,"2f   ","daa ",39,0,0,1,"27   ","di  ",243,0,0,1,"f3   ","ei  ",251,0,0,1,"fb   ","en  ",217,0,0,1,"d9   ","halt",118,0,0,1,"76   ","ind ",237,170,0,2,"ed aa","indr",237,186,0,2,"ed ba","ini ",237,162,0,2,"ed a2","inir",237,178,0,2,"ed b2","ldd ",237,168,0,2,"ed a8","lddr",237,184,0,2,"ed b8","ldi ",237,160,0,2,"ed a0","ldir",237,176,0,2,"ed b0","neg ",237,68,0,2,"ed 44","nop ",0,0,0,1,"00   "
+210 REM total opcodes0, opcode, v1, v2, v3, byte count, hex display
+211 LET tot0=35: DIM t$(tot0,4): DIM t(tot0): DIM u(tot0): DIM v(tot0): DIM w(tot0): DIM w$(tot0,8)
+212 FOR i=1 TO tot0: READ t$(i), t(i), u(i), v(i), w(i), w$(i): NEXT i
+214 DATA "ccf ",63,0,0,1,"3f   ","cpd ",237,169,0,2,"ed a9","cpdr",237,185,0,2,"ed b9","cpi ",237,161,0,2,"ed a1","cpir",237,177,0,2,"ed b1","cpl ",47,0,0,1,"2f   ","daa ",39,0,0,1,"27   ","di  ",243,0,0,1,"f3   ","ei  ",251,0,0,1,"fb   ","en  ",217,0,0,1,"d9   ","halt",118,0,0,1,"76   ","ind ",237,170,0,2,"ed aa","indr",237,186,0,2,"ed ba","ini ",237,162,0,2,"ed a2","inir",237,178,0,2,"ed b2","ldd ",237,168,0,2,"ed a8","lddr",237,184,0,2,"ed b8","ldi ",237,160,0,2,"ed a0","ldir",237,176,0,2,"ed b0","neg ",237,68,0,2,"ed 44","nop ",0,0,0,1,"00   ","otdr",237,187,0,2,"ed bb","otir",237,179,0,2,"ed b3","outd",237,171,0,2,"ed ab","outi",237,163,0,2,"ed a3","ret ",201,0,0,1,"c9   ","reti",237,77,0,2,"ed 4d","retn",237,69,0,2,"ed 45","rla ",237,23,0,1,"17   ","rlca",7,0,0,1,"07   ","rld ",237,111,0,2,"ed 6f","rra ",31,0,0,1,"1f   ","rrca",15,0,0,1,"0f   ","rrd ",237,103,0,2,"ed 67","scf ",55,0,0,1,"37   "
+
+220 REM total opcodes1, opcode, v1/offset, v2/offset, v3, byte count, hex display
+221 LET tot1=1: DIM a$(tot1,4): DIM a(tot1): DIM b(tot1): DIM c(tot1): DIM d(tot1): DIM d$(tot1,8)
+222 FOR i=1 TO tot1: READ a$(i), a(i), b(i), c(i), d(i), d$(i): NEXT i
+224 DATA "and", 160, 0, 0, 1
 
 240 FOR i=1 TO lc-1
-242    IF  n(i)=0 THEN GOTO gOpState0
-244    IF  o(i)=0 THEN GOTO gOpState1
-246    GOTO gOpState2
+242    IF  n(i)=0 THEN GOTO gOpState0: REM no args
+244    IF  o(i)=0 THEN GOTO gOpState1: REM one arg
+246    GOTO gOpState2: REM two args
 248 NEXT i
 
 250 GOTO gFinish
 
-260 REM gOpState0
-261 FOR j=1 TO max0: IF NOT (m$(i,TO m(i))=t$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),t$(j))
-262 IF j=max0+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
+260 REM gOpState0, no args
+261 FOR j=1 TO tot0: IF NOT (m$(i,TO m(i))=t$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),t$(j))
+262 IF j=tot0+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
 263 PRINT STR$(byteCount)+"  "+m$(i)+"  "+w$(j)
 264 LET byteCount=byteCount+w(j)
 279 GOTO gOpNext
 
-280 REM gOpState1
+280 REM gOpState1, one arg
+281 FOR j=1 TO tot1: IF NOT (m$(i,TO m(i))=a$(j,TO m(i))) THEN NEXT j
+282 IF j=tot1+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
+297 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+298 LET byteCount=byteCount+d(j)
 299 GOTO gOpNext
-
+ 
 300 REM gOpState2
 319 GOTO gOpNext
 
