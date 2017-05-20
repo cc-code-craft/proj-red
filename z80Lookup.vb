@@ -1,38 +1,28 @@
-'Reconfigure to use single rule base
+'Update tables to use single rule base, remove unused content, align table columns for easier editing
 '
-'Opcodes Sorted By Name
-
-'z80 » Opcodes
-
-'NN means 2 bytes stored most significant byte first. N means 1 byte.
+'Z80 Opcodes
+' - N  = 1 byte  (0-255)
+' - No = 1 byte  (0- +/-127)
+' - NN = 2 bytes (0-255)h (0-255)l stored most significant byte first
 
 ' adc add and bit call ccf cp cpd cpdr cpi cpir cpl daa dec di djnz ei ex en halt im in inc ind indr ini inir jp jr ld ldd lddr ldi ldir neg nop or otdr otir outd outi out pop push res ret rl rla rlc rlca rld rr rra rrc rrca rrd rst sbc scf set sla sra srl sub xor
 
-' parse 2+ args
-' adc add bit ld res set
-
 ' parse 2 args
-' ex in out
-
-' parse 1+ args
-' call cp dec(^) inc(^) rl rlc rr rrc sbc(*) sla sub xor
+' adc add bit ex in ld out res set
 
 ' parse 1 args
-' and dec(^) djnz im jp(') jr(') or pop push rst sra srl
+' and call cp dec djnz im inc jp jr or pop push rl rlc rr rrc rst sbc sla sra srl sub xor
 
-' parse 0+ args
-' ret(^)
-
-'---------------------------------------------------------------                        
 ' parse 0 args
-' ccf cpd cpdr cpi cpir cpl daa di ei en halt ind indr ini inir ldd lddr ldi ldir neg nop otdr otir outd outi ret(^), reti, retn, rla rlca rld rra rrca rrd scf
+' ccf cpd cpdr cpi cpir cpl daa di ei en halt ind indr ini inir ldd lddr ldi ldir neg nop otdr otir outd outi ret reti retn rla rlca rld rra rrca rrd scf
 
-'<op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
-'"ccf ",0   ,63 ,0   ,0     ,0 ,0 ,0
-'"cpd" ,0   ,169,0   ,0     ,0 ,0 ,0    
+----------------------------------------------------------------------
 
-parse rule 0.1
-<op><rule><code><hex>
+' parse 0 args
+' - rule 0: <op>           | size=1 | no prefix
+' - rule 1: ed(237) <op> + | size=2 | prefix +offset
+
+<op$><rule><code><hex$>
 "ccf ",0,63,"3f   ",
 "cpd ",1,169,"ed a9",
 "cpdr",1,185,"ed b9",
@@ -69,238 +59,93 @@ parse rule 0.1
 "rrd ",1,103,"ed 67",
 "scf ",0,55,"37   "
 
+----------------------------------------------------------------------
 
-'---------------------------------------------------------------                        
 ' parse 1 arg
-' and djnz im inc(^) jp(') jr(') or pop push ret rst sra srl
-
-' Alternative Lookup Table
-' <op>,<parse mode>,<parse func>,<param1>,<param2>
-'
-
-' pattern
-'   1.0: <op> N,b,c,d,e,h,l,(hl),(ix+No)(iy+No),a | adc,add,sbc,sub,xor
-'   1.1: <op> bc,de,hl,ix,iy,sp/af
-'   1.2: <op> N N                                 | call,jp
-'   1.3: <op-calc-rel-jmp> No                     | djnz,jr
-'   1.4: im 0,1,2
-'   1.5: jp (hl),(ix),(iy)
-'   1.6: ret z,c,pe,m
-'   1.7: ret nz,nc,po,p
-'   1.8: <op> cb prefix, then 1.1    | rl,rlc,rr,rrc,sla,sra,srl
-'   1.9: rst 0h to 38h
-'
-'   2.0: <op> <r> N,b,c,d,e,h,l,(hl),(ix+No)(iy+No),a | ld,adc,add
-'   2.1: <op> <rr> bc,de,hl,ix,iy,sp/af               | adc hl,add hl,sbc hl
-'   2.2: <op> z,c,pe,m   N N                          | call,jp
-'   2.3: <op> nz,nc,po,p N N                          | call,jp
-'   2.4: ex (sp)|af|de
-'   2.5: in|out (ed prefix)
-'   2.6: <jr-calc-rel-jmp> z,c,nz,nc No
-'   2.7: sbc a
-'   2.8: <op> cb prefix, then 2.1     | bit,res,set
-'   2.9 ld (bc),(de),(NN)....
-'   2.?? ld ....
-
-<op>,<type>,<rule>,<code>,<bytes>,<hex str>,<offset>
-' pattern - one arg
-'   1.1: <op> N              | adc,add,sbc,sub,xor
-'   2.2: <op> b,c,d,e,h,l,a  | adc,add,sbc,sub,xor
-'   3.3: <op> (hl)           | adc,add,sbc,sub,xor
-'   4.4: <op> (ix+No),(iy+No)
-'   5.5: <op> bc,de,hl,ix,iy,sp/af
-'   1.6: <op> NN             | call,jp
-'   1.7: <op> No             | djnz,jr => calc rel val
-'   2.8: im 0,1,2
-'   3.9: jp (hl),(ix),(iy)
-'   2.10: ret z,c,pe,m
-'   5.11: ret nz,nc,po,p
-'   2.12: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
-'   3.13: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
-'   4.14: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
-'   5.15: rst 0h to 38h
-
-"and",1,1,230,2,"e6 N   ",0
-   "",2,2,160,1,"a0+offs",1
-   "",3,3,166,1,"a6     ",0
-   "",4,4,166,3,"dd a6 N",0
-----------------------------
+' - rule 0: <op>           | size=1 | no prefix
+' - rule 1: ed(237) <op> + | size=2 | prefix +offset
+' - rule 2: <op> N         | size=2 
+' - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
+' - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
+' - rule 5: <op> N N       | size=3
+' ------------------------------------------------------------------
+' - rule 8: <op> No             | djnz,jr => calc rel val
+' - rule 9: im 0,1,2
+' - rule 10: jp (hl),(ix),(iy)
+' - rule 11: ret z,c,pe,m
+' - rule 12: ret nz,nc,po,p
+' - rule 13: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+' - rule 14: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+' - rule 15: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+' - rule 16: rst 0h to 38h
 
 <op$>,<key> | <type>,<rule>,<code>,<offset>,<hex$>
-"and",1    1| 1,1,230,0,"e6 N     "
-           2| 2,2,160,1,"a0+offset"
-           3| 3,3,166,0,"a6       "
-           4| 4,4,166,0,"dd a6 No "
-"call",5   5| 1,6,205,0,"cd N N   " =>irreg<=  
-"dec",6    6| 2,2,5,8,"05+offset"
-           7| 3,3,35,0,"35       "
-           8| 4,4,35,0,"dd 35 No "
-           9| 5,5,11,16,"0b+offset"
+"and",1    1| 1,2,230,0,"e6 N    ",
+           2| 2,3,160,1,"a0 +    ",
+           3| 3,3,166,0,"a6      ",
+           4| 4,3,166,0,"dd a6 No",
+"call",5   5| 1,5,205,0,"cd N N  ",
+"dec",6    6| 2,3,5,8,  "05 +    ",
+           7| 3,3,35,0, "35      ",
+           8| 4,3,35,0, "dd 35 No",
+           9| 5,4,11,16,"0b +    "
 "---",10    | =>end<=
 
+----------------------------------------------------------------------
+
+' parse 2 args
+' - rule 0: <op>           | size=1 | no prefix
+' - rule 1: ed(237) <op> + | size=2 | prefix +offset
+' - rule 2: <op> N         | size=2 
+' - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
+' - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
+' - rule 5: <op> N N       | size=3
 
 <op$>,<val$>,<key> | <type>,<rule>,<code>,<offset>,<hex$>
-"adc","a",1       1| 1,1,206,0,"ce N     "
-                  2| 2,2,136,1,"88+offset"
-                  3| 3,3,142,0,"8e       "
-                  4| 4,4,142,0,"dd 8e No "
-"adc","hl",5      5| 5,5,074,16,"ed 4a+off"
-"add","a",6       6| 1,1,198,0,"c6 N     "
-                  7| 2,2,128,1,"80+offset"
-                  8| 3,3,134,0,"86       "
-                  9| 4,4,134,0,"dd 86 No "
-"add","hl",10    10| 5,5,009,16,"09+offset"
-"add","ix",11    11| 5,6,009,16,"dd 09+off"
-"add","iy",12    12| 5,6,009,16,"fd 09+off"
-"call","*",13    13| 9,7,204,16,"cc N N   "   *=>match any, 99=>irregular
+"adc","a",1       1| 1,2,206,0, "ce N    ",
+                  2| 2,3,136,1, "88 +    ",
+                  3| 3,3,142,0, "8e      ",
+                  4| 4,3,142,0, "dd 8e No",
+"adc","hl",5      5| 5,1,074,16,"ed 4a + ",
+"add","a",6       6| 1,2,198,0, "c6 N    ",
+                  7| 2,3,128,1, "80 +    ",
+                  8| 3,3,134,0, "86      ",
+                  9| 4,3,134,0, "dd 86 No",
+"add","hl",10    10| 5,4,009,16,"09 +    ",
+"add","ix",11    11| 5,6,009,16,"dd 09 + ",
+"add","iy",12    12| 5,6,009,16,"fd 09 + ",
+"call","*",13    13| 9,5,204,16,"cc N N  "
 "---","--",14      | =>end<=
 
+*=>match any, 9=>irregular
+----------------------------------------------------------------------
 
-"adc",1     1,"a",1         
-            2,"hl",5        
-"add",3     3,"a",6         
-            4,"hl",10       
-            5,"ix",11       
-            6,"iy",12       
-"bit",7     7,"0",13         13,2,2,???,2,"cb 40+off",1
-            8,"(hl)",14      14,...
-            9,"(ix+No)",15   15,...
-           10,"1",16         16,...
-           11,"2",17         17,...
-           ---------        
-           16,"7",22         22,...
-"call",23  23,"*",24         24,...
+' -consider adding type: <op>,<type>,...
+'   - type 0: no args, type 1: one arg,8-bit, type 2: one arg,16-bit
+' -consider adding prefix
+'   - prfx 0: none,    prfx 1: ED before op,  prfx 2: ix=>DD+hl, prfx 3: iy=>FD+hl
+' - consider combining type & prefix using bit vals (to decimal)
+'   - 000ppttt: 0=>p=0,t=0 1=>p=0,t=1 8=>p=1,t=0
+' 
+' N=1 byte (0 to 255), No=1 byte (-127 to +127), NN=2 bytes
+' 
+' op N|NN = 2|3 bytes (calc bytes: N if < 256, otherwise NN)
+' op r = 1 byte
+' op (ir+N) = 3 bytes
+' op rr = 1 byte
+' op ir = 2 bytes
+' 
+' lookup val based on arg type: N number, r 8bit reg, rr 16bit reg
+' lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
+' 
+' Hex Conversion
+' ((n:0-15)*16)+(n:0-16)
 
+---------------------------------------------------------------
 
-'       add a,b           80
-'       bit 0,b           cb 40
-'       bit 0,(hl)        cb 46
-'       bit 0,(ix+No)      dd cb N  46
-'       -> create rule exception for call:type 2 r, call:type 5 rr
-'       call z,NN         cc N  N
-'       call c,NN         dc N  N
-'       call pe,NN        ec N  N
-'       call m,NN         fc N  N
-'       ld b,b            40
+=====>  Parse 1 Arg  <=====
 
-----------------------------
-
-<op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
-"and" ,230 ,160,166 ,1     ,0 ,0 ,0
-"call",205 ,0  ,0   ,0     ,0 ,0 ,0
-"cp"  ,254 ,184,190 ,1     ,0 ,0 ,0
-"dec" ,0   ,05 ,35  ,8     ,11,43,16    
-"jr"  ,18  ,0  ,0   ,0     ,0 ,0 ,0
-
-"dec r     ",05,0,8,1,    "hh     "  start opcode 5, offset 8, 1 byte
-"dec (hl)  ",35,0,8,1,    "hh     "  merge with above?
-"dec (ir+N)",221,253,35,3,"hh hh N"  ix, iy, opcode, 3 bytes
-"dec rr    ",11,0,16,1,   "hh     "  start opcode 11, offset 16, 1 byte
-"dec ir    ",221,253,43,2,"hh hh  "  ix, iy, opcode, 2 bytes
---------------------------------------------------
-
-<op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
-"and" ,230 ,160,166 ,1     ,0 ,0 ,0
-
-<op>  ,arg1, N|NN,r  ,(hl),offset,rr,hl,offset
-"ld"  ,"b-l",06  ,40 ,46  ,1     ,0 ,0 ,0
-
-<op>,prefix(0|num),arg1,r,(hl),offset... | <op>,rule,param1,param2,...
-'-----------------------------------------------------------------------
-
--consider adding type: <op>,<type>,...
-  - type 0: no args, type 1: one arg,8-bit, type 2: one arg,16-bit
--consider adding prefix
-  - prfx 0: none,    prfx 1: ED before op,  prfx 2: ix=>DD+hl, prfx 3: iy=>FD+hl
-- consider combining type & prefix using bit vals (to decimal)
-  - 000ppttt: 0=>p=0,t=0 1=>p=0,t=1 8=>p=1,t=0
-
-N=1 byte (0 to 255), No=1 byte (-127 to +127), NN=2 bytes
-
-op N|NN = 2|3 bytes (calc bytes: N if < 256, otherwise NN)
-op r = 1 byte
-op (ir+N) = 3 bytes
-op rr = 1 byte
-op ir = 2 bytes
-
-lookup val based on arg type: N number, r 8bit reg, rr 16bit reg
-lookup ir: ix prefix DD/221, iy prefix FD/253, used with (hl),hl
-
-Hex Conversion
-((n:0-15)*16)+(n:0-16)
-
-parse rule 1.1
-<op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
-"and" ,230 ,160,166 ,1     ,0 ,0 ,0
-"call",205 ,0  ,0   ,0     ,0 ,0 ,0
-"cp"  ,254 ,184,190 ,1     ,0 ,0 ,0
-"dec" ,0   ,05 ,35  ,8     ,11,43,16    
-"jr"  ,18  ,0  ,0   ,0     ,0 ,0 ,0
-
----------------------
-
-"and N     ",230,0,0,2,    "hh N   "  opcode, 2 bytes
-"and r     ",160,0,1,1,    "hh     "  start opcode 160, offset 1, 1 byte
-"and (hl)  ",166,0,1,1,    "hh     "  merge with above?
-"and (ir+No)",221,253,166,3,"hh hh No"  ix, iy, opcode, 3 bytes
-
-"and N     ",230,0,0,2,"e6 N   "
-"and b     ",160,0,1,1,"a0     "
-"and c     ",161,0,1,1,"a1     "
-"and d     ",162,0,1,1,"a2     "
-"and e     ",163,0,1,1,"a3     "
-"and h     ",164,0,1,1,"a4     "
-"and l     ",165,0,1,1,"a5     "
-"and (hl)  ",166,0,1,1,"a6     "
-"and (ix+No)",221,166,0,3,"dd a6 N"
-"and (iy+No)",253,166,0,3,"fd a6 N"
-"and a     ",167,0,1,1,"a7     "
-
----------------------
-
-"and","1 N     ",1,1,230,0,0,2,"e6 N   "
-"and","1 b     ",2,2,160,0,1,1,"a0+offs"
-"and","1 c     ",1,1,161,0,1,1,"a1     "
-"and","1 d     ",1,1,162,0,1,1,"a2     "
-"and","1 e     ",1,1,163,0,1,1,"a3     "
-"and","1 h     ",1,1,164,0,1,1,"a4     "
-"and","1 l     ",1,1,165,0,1,1,"a5     "
-"and","1 (hl)  ",3,3,166,0,1,1,"a6     "
-"and","1 (ix+N)",4,4,221,166,0,3,"dd a6 N"
-"and","1 (iy+N)",1,1,253,166,0,3,"fd a6 N"
-"and","1 a     ",1,1,167,0,1,1,"a7     "
-
----------------------
-
-"call NN   ",205,0,0,0,"cd     "
-
----------------------
-
-"dec r     ",05,0,8,1,    "hh     "  start opcode 5, offset 8, 1 byte
-"dec (hl)  ",35,0,8,1,    "hh     "  merge with above?
-"dec (ir+N)",221,253,35,3,"hh hh N"  ix, iy, opcode, 3 bytes
-"dec rr    ",11,0,16,1,   "hh     "  start opcode 11, offset 16, 1 byte
-"dec ir    ",221,253,43,2,"hh hh  "  ix, iy, opcode, 2 bytes
-
-"dec b     ",05,0,0,1,  "05     "   
-"dec c     ",13,0,8,1,  "0d     "
-"dec d     ",21,0,16,1, "15     "
-"dec e     ",29,0,24,1, "1d     "
-"dec h     ",37,0,32,1, "25     "
-"dec l     ",45,0,40,1, "2d     "
-"dec (hl)  ",53,0,48,1, "35     "
-"dec (ix+No)",221,53,0,3,"dd 35 N"
-"dec (iy+No)",253,53,0,3,"fd 35 N"
-"dec a     ",61,0,8,1,  "3d     "
-"dec bc    ",11,0,0,0,  "0b     "
-"dec de    ",27,0,16,1, "1b     "
-"dec hl    ",43,0,32,1, "2b     "
-"dec ix    ",221,43,0,2,"dd 2b  "
-"dec iy    ",253,43,0,2,"fd 2b  "
-"dec sp    ",59,0,48,1, "3b     "
-
-'---------------------------------------------------------------                        
-' parse 1 arg
+---------------------------------------------------------------
 '
 '       and N             e6 N
 '       and b             a0
@@ -530,10 +375,11 @@ parse rule 1.1
 '       xor (iy+No)        fd ae N
 '       xor a             af
 '
-'
-'---------------------------------------------------------------                        
-' parse 2 args
-'
+---------------------------------------------------------------
+
+=====>  Parse 2 Args  <=====
+
+---------------------------------------------------------------
 '
 '       ld bc,NN          01 N  N
 '       ld de,NN          11 N  N
@@ -604,27 +450,6 @@ parse rule 1.1
 '
 '       ----------------------------------
 '
-parse rule 2.1
-<op>  ,arg1, N|NN,r  ,(hl),offset,rr,hl,offset
-"ld"  ,"b-l",06  ,40 ,46  ,1     ,0 ,0 ,0
-"ld"  ,"a" , 3e  ,78 ,7e  ,1     ,0 ,0 ,0
-"adc" ,"a" , ce  ,88 ,8e  ,1     ,4a,? ,16(4)
-"adc" ,"hl"
-"add" ,"a" , c6  ,80 ,86  ,1     ,09,09 ,16(4)
-"add" ,"hl"
-"add" ,"ix"
-"add" ,"iy"
-"call","z"...
-"call","nz"...
-"jp"  ,"z"...
-"jp"  ,"nz"...
-"jr"  ,"z"...  (also "jr" one arg)
-
-parse rule 2.2
-"bit" ,"0-7",0   ,cb|40(2 byte op), 46... rule breaker
-"res"
-"set"
-
 '       ld b,N            06 N
 '       ld c,N            0e N
 '       ld d,N            16 N
@@ -1058,54 +883,13 @@ parse rule 2.2
 '       set 7,e           cb fb
 '       set 7,h           cb fc
 '       set 7,l           cb fd
-'
-'
-'----- Pattern Search  -----------------------------------------------                        
 
-'order
-b        ?8
-c        ?9
-d        ?A
-e        ?B
-h        ?C
-l        ?D
-(hl)     ?E
-(ix+No)   DD ?E N
-(iy+No)   FD ?E N
-a        ?F
+---------------------------------------------------------------
 
-'"add",128,50,"add",9,149 "and",160,48
-                                              
-'   add a,(hl)   86        and (hl)   a6        
-'   add a,(ix+No) dd 86 N   and (ix+No) dd a6 N   
-'   add a,(iy+No) fd 86 N   and (iy+No) fd a6 N   
-'   add a,a      87        and a      a7        
-'   add a,b      80        and b      a0        
-'   add a,c      81        and c      a1        
-'   add a,d      82        and d      a2        
-'   add a,e      83        and e      a3        
-'   add a,h      84        and h      a4        
-'   add a,l      85        and l      a5        
-'   add a,N      c6 N      and N      e6 N      
+=====>  Full List  <=====
 
-'   cp (hl)   be           dec (hl)   35     
-'   cp (ix+No) dd be N      dec (ix+No) dd 35 N
-'   cp (iy+No) fd be N      dec (iy+No) fd 35 N
-'   cp a      bf           dec a      3d     
-'   cp b      b8           dec b      05       dec bc     0b
-'   cp c      b9           dec c      0d       
-'   cp d      ba           dec d      15       dec de     1b
-'   cp e      bb           dec e      1d   
-'   cp h      bc           dec h      25      
-'   cp l      bd           dec hl     2b   
-'   cp N      fe N         dec ix     dd 2b 
-'                          dec iy     fd 2b
-'                          dec l      2d  
-'                          dec sp     3b  
+---------------------------------------------------------------
 
-                              
-'----- Full List -----------------------------------------------                        
-'                          
 '       adc a,(hl)        8e
 '       adc a,(ix+No)      dd 8e N
 '       adc a,(iy+No)      fd 8e N
