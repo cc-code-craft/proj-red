@@ -1,4 +1,4 @@
-' Use single rule base, add sPrintResult
+' Working! More testing needed. Create a single lookup table for all arg counts
 '
 1 REM       ini
 2 REM !loop ldd
@@ -37,7 +37,7 @@
 35 REM  - labels prefixed by '!', numbers by '@' and must be decimal
 
 36 REM --------------------------------------------------------------
-37 REM   temp vars:                             i,j,k,                               t$,          w$,x$,x,y$,y,z,z$
+37 REM   temp vars: (free v,v$,g,h,q,s,s$)      i,j,k,                               t$,          w$,x$,x,y$,y,z,z$
 38 REM   DIM  vars: a,a$,b,c,d,e,e$,f,f$,g,g$,h,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,s$,   u,u$,v,v$,
 39 REM --------------------------------------------------------------
  
@@ -99,34 +99,31 @@
 202 LET byteCount=0
 203 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350: LET gFinish=400
 204 LET sGetArgType=530: LET sRuleBase=1000
-205 LET sPrintResult=8000: LET sDebug1=8350
+205 LET sPrintResult=8000: LET sPrintError=8050: LET sDebug1=8350
 
 206 REM GOSUB sDebug1
 
-209 REM total opcodes0, u$=opcode, u=rule, v=mcode, v$=hex
-211 LET tot0=35: DIM u$(tot0,4): DIM u(tot0): DIM v(tot0): DIM v$(tot0,5)
-212 FOR i=1 TO tot0: READ u$(i), u(i), v(i), v$(i): NEXT i
-214 DATA "ccf ",0,63,"3f   ","cpd ",1,169,"ed a9","cpdr",1,185,"ed b9","cpi ",1,161,"ed a1","cpir",1,177,"ed b1","cpl ",0,47,"2f   ","daa ",0,39,"27   ","di  ",0,243,"f3   ","ei  ",0,251,"fb   ","en  ",0,217,"d9   ","halt",0,118,"76   ","ind ",1,170,"ed aa","indr",1,186,"ed ba","ini ",1,162,"ed a2","inir",1,178,"ed b2","ldd ",1,168,"ed a8","lddr",1,184,"ed b8","ldi ",1,160,"ed a0","ldir",1,176,"ed b0","neg ",1,68,"ed 44","nop ",0,0,"00   ","otdr",1,187,"ed bb","otir",1,179,"ed b3","outd",1,171,"ed ab","outi",1,163,"ed a3","ret ",0,0,"c9   ","reti",1,77,"ed 4d","retn",1,69,"ed 45","rla ",1,23,"17   ","rlca",0,7,"07   ","rld ",1,111,"ed 6f","rra ",0,31,"1f   ","rrca",0,15,"0f   ","rrd ",1,103,"ed 67","scf ",0,55,"37   "
+209 REM total opcodes0, u$=opcode, u=key
+211 LET tot0=36: DIM u$(tot0,4): DIM u(tot0)
+212 FOR i=1 TO tot0: READ u$(i), u(i): NEXT i
+214 DATA "ccf ", 1,"cpd ", 2,"cpdr", 3,"cpi ", 4,"cpir", 5,"cpl ", 6,"daa ", 7,"di  ", 8,"ei  ", 9,"en  ",10,"halt",11,"ind ",12,"indr",13,"ini ",14,"inir",15,"ldd ",16,"lddr",17,"ldi ",18,"ldir",19,"neg ",20,"nop ",21,"otdr",22,"otir",23,"outd",24,"outi",25,"ret ",26,"reti",27,"retn",28,"rla ",29,"rlca",30,"rld ",31,"rra ",32,"rrca",33,"rrd ",34,"scf ",35,"----",36 
 
 215 REM total opcodes1, a$=opcode, a=key
 216 LET tot1=4: DIM a$(tot1,4): DIM a(tot1)
 217 FOR i=1 TO tot1: READ a$(i), a(i): NEXT i
-218 DATA "and",1,"call",5,"dec",6,"---",10
+218 DATA "and ",36,"call",40,"dec ",41,"----",45
 
-219 REM total keys, b=type, c=rule, d=mcode, e=offset, e$=hex display
-220 LET totK1=9: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
-221 FOR i=1 TO totK1: READ b(i), c(i), d(i), e(i), e$(i): NEXT i
-222 DATA 1,2,230,0,"e6 N    ",2,3,160,1,"a0 +    ",3,3,166,0,"a6      ",4,3,166,0,"dd a6 No",1,5,205,0,"cd N N  ",2,3,5,8,  "05 +    ",3,3,35,0, "35      ",4,3,35,0, "dd 35 No",5,4,11,16,"0b +    "
+219 REM total opcodes2, f$=opcode, g$=val, f=key
+220 LET tot2=7: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
+221 FOR i=1 TO tot2: READ f$(i), g$(i), f(i): NEXT i
+222 DATA "adc ","a",  45,"adc ","hl", 49,"add ","a",  50,"add ","ix", 55,"add ","iy", 56,"call","*" , 57,"----","--", 58 
 
-223 REM total opcodes2, f$=opcode, g$=val, f=key
-224 LET tot2=8: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
-225 FOR i=1 TO tot2: READ f$(i), g$(i), f(i): NEXT i
-226 DATA "adc","a",1,"adc","hl",5,"add","a",6,"add","hl",10,"add","ix",11,"add","iy",12,"call","*",13,"---","--",14
-
-227 REM total keys, g=type, h=rule, q=mcode, s=offset, s$=hex display
-228 LET totK2=13: DIM g(totK2): DIM h(totK2): DIM q(totK2): DIM s(totK2): DIM s$(totK2,8)
-229 FOR i=1 TO totK2: READ g(i), h(i), q(i), s(i), s$(i): NEXT i
-230 DATA 1,2,206,0, "ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,009,16,"09 +    ",5,6,009,16,"dd 09 + ",5,6,009,16,"fd 09 + ",9,5,204,16,"cc N N  "
+223 REM total keys, b=type, c=rule, d=mcode, e=offset, e$=hex display
+224 LET totK1=57: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
+225 FOR i=1 TO totK1: READ b(i), c(i), d(i), e(i), e$(i): NEXT i
+226 DATA 0,0,63, 0,"3f   ",0,1,169,0,"ed a9",0,1,185,0,"ed b9",0,1,161,0,"ed a1",0,1,177,0,"ed b1",0,0,47, 0,"2f   ",0,0,39, 0,"27   ",0,0,243,0,"f3   ",0,0,251,0,"fb   ",0,0,217,0,"d9   ",0,0,118,0,"76   ",0,1,170,0,"ed aa",0,1,186,0,"ed ba",0,1,162,0,"ed a2",0,1,178,0,"ed b2",0,1,168,0,"ed a8",0,1,184,0,"ed b8",0,1,160,0,"ed a0",0,1,176,0,"ed b0",0,1,68, 0,"ed 44",0,0,0,  0,"00   ",0,1,187,0,"ed bb",0,1,179,0,"ed b3",0,1,171,0,"ed ab",0,1,163,0,"ed a3",0,0,201,0,"c9   ",0,1,77, 0,"ed 4d",0,1,69, 0,"ed 45",0,1,23, 0,"17   ",0,0,7,  0,"07   ",0,1,111,0,"ed 6f",0,0,31, 0,"1f   ",0,0,15, 0,"0f   ",0,1,103,0,"ed 67",0,0,55, 0,"37   "
+227 DATA 1,2,230,0, "e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",2,3,5,  8, "05 +    ",3,3,35, 0, "35      ",4,3,35, 0, "dd 35 No",5,4,11, 16,"0b +    "
+228 DATA 1,2,206,0, "ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + !!!",5,6,009,16,"dd 09 + ",5,6,009,16,"fd 09 + ",9,5,204,16,"cc N N  "
 
 231 REM reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
 232 DIM r(9): FOR k=1 TO 9: READ r(k): NEXT k
@@ -142,47 +139,48 @@
 
 250 REM --- gOpState0, no args ---------------------
 251 FOR j=1 TO tot0: IF NOT (m$(i,TO m(i))=u$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),u$(j))
-252 IF j=tot0+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
+252 IF j=tot0+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
+254 LET z$="": LET argType=0: LET key=j
 
-255 GOSUB sRuleBase+(u(j)*100): REM process rule
+255 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
 299 GOTO gOpNext
 
 300 REM --- gOpState1, one arg ---------------------
 301 FOR j=1 TO tot1: IF NOT (m$(i,TO m(i))=a$(j,TO m(i))) THEN NEXT j
-302 IF j=tot1+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
+302 IF j=tot1+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
 
-305 IF b(j)=9 THEN GOTO 320: REM match any arg type
+305 IF b(a(j))=999 THEN GOTO 320: REM match any arg type
 
 307 REM get rule to process arg1
-308 LET z$=n$(i,TO n(i)): LET argType=0
-309 GOSUB sGetArgType
+308 LET z$=n$(i,TO n(i))
+309 LET argType=0: GOSUB sGetArgType
 
-315 REM gLookupArg
 316 LET rules=a(j+1)-a(j): LET key=a(j)
 317 FOR k=0 TO rules-1: IF NOT b(key+k)=argType THEN NEXT k
-318 IF k=rules THEN PRINT "error: arg type not found - "+m$(i): STOP
-319 LET j=j+k
+318 IF k=rules THEN LET w$="error: arg type not found": GOSUB sPrintError: STOP
+319 LET key=key+k
 
-320 GOSUB sRuleBase+(c(j)*100)
+320 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
 322 GOTO gOpNext
 
-350 REM gOpState2, two args
+350 REM --- gOpState2, two args ---------------------
 351 FOR j=1 TO tot2: IF NOT ( m$(i,TO m(i))=f$(j,TO m(i)) AND n$(i,TO n(i))=g$(j,TO n(i))) THEN NEXT j
-352 IF j=tot2+1 THEN PRINT "error: opcode not found - "+m$(i)+" "+n$(i): STOP
+352 IF j=tot2+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
 
-355 IF f(j)=9 THEN GOTO 365: REM match any arg type
+355 IF b(f(j))=999 THEN GOTO 365: REM match any arg type
 
 357 REM get rule to process arg2
-358 LET z$=o$(i,TO o(i)): LET argType=0
-359 GOSUB sGetArgType
+358 LET z$=o$(i,TO o(i))
+359 LET argType=0: GOSUB sGetArgType
 
-365 REM gLookupArg
+360 REM ============> Create sGetRule <===============
+
 366 LET rules=f(j+1)-f(j): LET key=f(j)
-367 FOR k=0 TO rules-1: IF NOT g(key+k)=argType THEN NEXT k
-368 IF k=rules THEN PRINT "error: arg type not found - "+m$(i): STOP
-369 LET j=j+k
-
-398 GOSUB sRuleBase+(h(j)*100)
+367 FOR k=0 TO rules-1: IF NOT b(key+k)=argType THEN NEXT k
+368 IF k=rules THEN LET w$="error: arg type not found": GOSUB sPrintError: STOP
+369 LET key=key+k
+    
+398 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
 399 GOTO gOpNext
 
 400 REM gFinish
@@ -196,7 +194,7 @@
 510    LET t$=t$+CHR$(ch)
 512    LET codeLoc=codeLoc+1
 514 NEXT k
-516 PRINT "error: sGetToken - token too long": STOP
+516 LET w$="error: sGetToken - token too long": GOSUB sPrintError: STOP
 
 520 REM sGetDelim(t$,d$,index) sets index to loc of d$ in t$ or 0
 521 LET index=0
@@ -204,6 +202,8 @@
 523    IF t$(k)=d$ THEN LET index=k: RETURN
 524 NEXT k
 525 RETURN
+
+529 REM arg types 1:N | 2:r | 3:(hl) | 4:(ir+No) | 5:rr
 
 530 REM sGetArgType(in:z$, out:argType) sets argType based on z$
 531 IF z$(1)="@" THEN LET argType=1: RETURN: REM one byte num 
@@ -222,61 +222,77 @@
 995 REM - rule 5: <op> N N       | size=3
 
 1000 REM sRuleBase:0 <op> | size=1 | no prefix
-1002 LET mcode=v(j): LET bytes=1
-1004 LET w$=STR$(mcode)
+1002 LET w$=STR$(d(key)): LET bytes=1
 1097 GOSUB sPrintResult
 1098 LET byteCount=byteCount+bytes
 1099 RETURN
 
 1100 REM sRuleBase:1 ed(237) <op> + | size=2 | prefix +offset
-1110 IF n(i)=0 THEN LET mcode=v(j): LET bytes=2: LET w$="237 "+STR$(mcode): GOTO 1197: REM no args
-1120 IF o(i)=0 THEN LET mcode=d(j): LET bytes=2: LET w$="237 "+STR$(mcode): GOTO 1297: REM 1 arg
-1129 REM ===> Needs Work <===
-1130 LET mcode=q(j): LET bytes=2: LET w$="237 "+STR$(mcode)
-1197 GOSUB sPrintResult
+1105 IF z$="" THEN LET w$="237 "+STR$(d(key)): LET bytes=2: GOTO 1195: REM no args
+1109 REM ======> KW: to do - if arg then lookup offset based on arg
+1110 LET w$="237 "+STR$(d(key)): LET bytes=2
+1195 GOSUB sPrintResult
 1198 LET byteCount=byteCount+bytes
 1199 RETURN
 
 1200 REM sRuleBase:2 <op> N | 2 bytes
-1210 IF o(i)=0 THEN LET mcode=d(j): LET bytes=2: LET w$=STR$(mcode): GOTO 1297: REM 1 arg
-1220 LET mcode=q(j): LET bytes=2: LET w$="237 "+STR$(mcode): REM 2 args
+1204 LET t$=z$
+1206 LET d$=",": GOSUB sGetDelim
+1210 LET t$=z$(index+2 TO)
+1220 LET w$=STR$(d(key))+" "+t$: LET bytes=2
 1297 GOSUB sPrintResult
 1298 LET byteCount=byteCount+bytes
 1299 RETURN
 
-1300 REM ===> Update for 2 args <=== sRuleBase:3 <op> r,(rr) | 1 byte | (ir+No) | 2 bytes
-1302 LET w$="rule3": LET bytes=1: LET offset=0
-1304 LET lval=(CODE n$(i) - CODE("a")) + 1
-1306 IF lval>0 THEN LET offset=r(lval)*e(j): GOTO 1297: REM RETURN
-1308 LET offset=6*f(j)
-1310 IF n$(i,2)="h" THEN GOTO 1297: REM RETURN
-1312 REM process ix, iy
-1314 LET t$=n$(i): LET idx1=0: LET idx2=0
+1300 REM sRuleBase:3 <op> r,(rr) | 1 byte | (ir+No) | 2 bytes
+1302 LET offset=0
+1304 LET lval=(CODE z$(1) - CODE("a")) + 1
+1306 IF  lval>0 THEN LET offset=r(lval)*e(key): GOTO 1340: REM a-l
+1308 LET offset=6*e(key): REM (hl)
+1310 IF  z$(2)="h" THEN GOTO 1340
+
+1314 LET t$=z$: REM process ix, iy
 1316 LET d$="@": GOSUB sGetDelim: LET idx1=index+1
 1318 LET d$=")": GOSUB sGetDelim: LET idx2=index-1
-1320 LET t$=n$(i,idx1 TO idx2): LET num=VAL(t$)
-1322 IF n$(i,3)="x" THEN PRINT "ix=>dd "+STR$(offset)+" "+t$
-1324 IF n$(i,3)="y" THEN PRINT "iy=>fd "+STR$(offset)+" "+t$
-1326 LET bytes=bytes+2
+1320 LET t$=z$(idx1 TO idx2)
+1322 IF  z$(3)="x" THEN LET w$="dd "
+1324 IF  z$(3)="y" THEN LET w$="fd "
+1325 LET mcode=d(key)+offset
+1326 LET w$=w$+STR$(mcode)+" "+t$: LET bytes=3
+1335 GOTO 1397
+
+1340 LET mcode=d(key)+offset: LET bytes=1
+1344 LET w$=STR$(mcode)
 
 1397 GOSUB sPrintResult
 1398 LET byteCount=byteCount+bytes
 1399 RETURN
 
-1400 REM sRuleBase:4
-1401 LET w$="rule4": LET bytes=1
+1400 REM sRuleBase:4 <op> rr + | size=1 | +offset | <op> ir | size=2
+1401 LET w$="r4": LET bytes=1: REM use key for lookup
 1497 GOSUB sPrintResult
 1498 LET byteCount=byteCount+bytes
 1499 RETURN
 
 1500 REM sRuleBase:5
-1501 LET w$="rule5": LET bytes=1
+1501 LET w$="r5": LET bytes=1: REM use key for lookup
 1597 GOSUB sPrintResult
 1598 LET byteCount=byteCount+bytes
 1599 RETURN
 
-8000 REM sPrintResult(in:i, in:w$, in:bytes)
-8097 PRINT STR$(i)+" "+STR$(byteCount)+" "+m$(i)+" "+w$+" "+STR$(bytes)
+8000 REM sPrintResult(in:i, in:w$, in:argType, in:key, in:bytes)
+8015 PRINT STR$(byteCount);
+8020 PRINT TAB  2;m$(i,TO m(i));
+8022 PRINT TAB  6;n$(i,TO n(i));
+8024 PRINT TAB 11;o$(i,TO o(i));
+8030 PRINT TAB 15;STR$(argType);
+8035 PRINT TAB 17;STR$(c(key));
+8040 PRINT TAB 19;w$;
+8045 PRINT TAB 30;STR$(bytes)
+8049 RETURN
+
+8050 REM sPrintError(in:i, in:w$)
+8052 PRINT w$+"|"+m$(i,TO m(i))+"|"+n$(i,TO n(i))+"|"+o$(i,TO o(i))
 8099 RETURN
 
 8350 REM sDebug1(in:lc)
