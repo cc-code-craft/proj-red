@@ -121,6 +121,74 @@ parse rule 0.1
    "",2,2,160,1,"a0+offs",1
    "",3,3,166,1,"a6     ",0
    "",4,4,166,3,"dd a6 N",0
+----------------------------
+<op$>,<key> | <key>,<type>,<rule>,<code>,<bytes>,<hex$>,<offset>
+"and",1       1,1,1,230,2,"e6 N     ",0
+              2,2,2,160,1,"a0+offset",1
+              3,3,3,166,1,"a6       ",0
+              4,4,4,166,3,"dd a6 No ",0
+"call",5      5,1,6,205,3,"cd N N   ",0 =>irreg<=  
+"dec",6       6,2,2,5,1,"05+offset",8
+              7,3,3,35,1,"35       ",0
+              8,4,4,35,3,"dd 35 No ",0
+              9,5,5,11,1,"0b+offset",16
+
+<op$>,<val$>,<key> | <key>,<type>,<rule>,<code>,<bytes>,<hex$>,<offset>
+"adc","a",1           1,1,1,???,2,"ce N     ",0
+                      2,2,2,???,1,"88+offset",1
+                      3,3,3,???,1,"8e       ",0
+                      4,4,4,???,3,"dd 8e No ",0
+"adc","hl",5          5,5,?,???,2,"ed 4a+off",16
+"add","a",6           6,1,1,1,???,2,"c6 N     ",0
+                      7,2,2,???,1,"80+offset",1
+                      8,3,3,???,1,"86       ",0
+                      9,4,4,???,3,"dd 86 No ",0
+"add","hl",10        10,5,?,???,1,"09+offset",16
+"add","ix",11        11,5,?,???,1,"09+offset",16
+"add","iy",12        12,5,?,???,1,"09+offset",16
+"call","*",23        23,99,... *=>match any, 99=>irregular
+
+"adc",1     1,"a",1         
+            2,"hl",5        
+"add",3     3,"a",6         
+            4,"hl",10       
+            5,"ix",11       
+            6,"iy",12       
+"bit",7     7,"0",13         13,2,2,???,2,"cb 40+off",1
+            8,"(hl)",14      14,...
+            9,"(ix+No)",15   15,...
+           10,"1",16         16,...
+           11,"2",17         17,...
+           ---------        
+           16,"7",22         22,...
+"call",23  23,"*",24         24,...
+
+
+'       add a,b           80
+'       bit 0,b           cb 40
+'       bit 0,(hl)        cb 46
+'       bit 0,(ix+No)      dd cb N  46
+'       -> create rule exception for call:type 2 r, call:type 5 rr
+'       call z,NN         cc N  N
+'       call c,NN         dc N  N
+'       call pe,NN        ec N  N
+'       call m,NN         fc N  N
+'       ld b,b            40
+
+----------------------------
+
+<op>  ,N|NN,r  ,(hl),offset,rr,hl,offset
+"and" ,230 ,160,166 ,1     ,0 ,0 ,0
+"call",205 ,0  ,0   ,0     ,0 ,0 ,0
+"cp"  ,254 ,184,190 ,1     ,0 ,0 ,0
+"dec" ,0   ,05 ,35  ,8     ,11,43,16    
+"jr"  ,18  ,0  ,0   ,0     ,0 ,0 ,0
+
+"dec r     ",05,0,8,1,    "hh     "  start opcode 5, offset 8, 1 byte
+"dec (hl)  ",35,0,8,1,    "hh     "  merge with above?
+"dec (ir+N)",221,253,35,3,"hh hh N"  ix, iy, opcode, 3 bytes
+"dec rr    ",11,0,16,1,   "hh     "  start opcode 11, offset 16, 1 byte
+"dec ir    ",221,253,43,2,"hh hh  "  ix, iy, opcode, 2 bytes
 --------------------------------------------------
 
 <op>  ,N|NN,r  ,(hl),offset,rr,hl,offset

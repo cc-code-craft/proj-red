@@ -96,7 +96,7 @@
 200 REM Define lookup level based on opcode and args
 201 REM 0=no args, 1=one arg, 2=two args
 202 LET byteCount=0
-203 LET gOpState0=260: LET gOpState1=280: LET gOpState2=300: LET gOpNext=248: LET gFinish=350
+203 LET gOpState0=250: LET gOpState1=300: LET gOpState2=350: LET gOpNext=239: LET gFinish=400
 204 LET sRuleBaseOneArg=1000: LET sRuleBaseTwoArgs=3000
 205 LET sDebug1=8350
 
@@ -113,44 +113,55 @@
 
 224 DATA "and",1,1,230,2,"e6 N   ",0,"",2,2,160,1,"a0+offs",1,"",3,3,166,1,"a6     ",0,"",4,4,166,3,"dd a6 N",0
 
-240 FOR i=1 TO lc-1
-242    IF  n(i)=0 THEN GOTO gOpState0: REM no args
-244    IF  o(i)=0 THEN GOTO gOpState1: REM one arg
-246    GOTO gOpState2: REM two args
-248 NEXT i
+225 REM reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
+226 DIM o(9): FOR k=1 TO 9: READ o(k): NEXT k
+227 DATA 7,0,1,2,3,0,0,4,5
 
-250 GOTO gFinish
+235 FOR i=1 TO lc-1
+236    IF  n(i)=0 THEN GOTO gOpState0: REM no args
+237    IF  o(i)=0 THEN GOTO gOpState1: REM one arg
+238    GOTO gOpState2: REM two args
+239 NEXT i: REM gOpNext
 
-260 REM gOpState0, no args
-261 FOR j=1 TO tot0: IF NOT (m$(i,TO m(i))=t$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),t$(j))
-262 IF j=tot0+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
-263 PRINT STR$(byteCount)+"  "+m$(i)+"  "+w$(j)
-264 LET byteCount=byteCount+w(j)
-279 GOTO gOpNext
+240 GOTO gFinish
 
-280 REM gOpState1, one arg
-281 FOR j=1 TO tot1: IF NOT (m$(i,TO m(i))=a$(j,TO m(i))) THEN NEXT j
-282 IF j=tot1+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
+250 REM gOpState0, no args
+251 FOR j=1 TO tot0: IF NOT (m$(i,TO m(i))=t$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),t$(j))
+252 IF j=tot0+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
+253 PRINT STR$(byteCount)+"  "+m$(i)+"  "+w$(j)
+254 LET byteCount=byteCount+w(j)
+256 GOTO gOpNext
 
-283 LET argType=0: LET ruleTotal=5: LET gGetRule=289: REM search for rule based on arg type
-284 IF n$(i,1)="@" THEN LET argType=1: GOTO gGetRule: REM one byte num 
-285 IF n(i)=1 THEN LET argType=2: GOTO gGetRule: REM b,c,d,e,h,l,a
-286 IF n(i)=2 THEN LET argType=5: GOTO gGetRule: REM bc,de,hl,ix,iy
-287 IF n(i)=4 THEN LET argType=3: GOTO gGetRule: REM (hl)
-288 LET argType=4: REM (ix+No),(iy+No)
+300 REM gOpState1, one arg
+301 FOR j=1 TO tot1: IF NOT (m$(i,TO m(i))=a$(j,TO m(i))) THEN NEXT j
+302 IF j=tot1+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
 
-289 LET ruleTotal=4
-290 FOR k=0 TO ruleTotal-1: IF NOT a(j+k)=argType THEN NEXT k
-291 IF k=ruleTotal THEN PRINT "error: arg type not found - "+m$(i): STOP
+304 REM check for irregular type first (type:99) => apply rule directly
+305 IF a(j)=99 THEN GOSUB sRuleBaseOneArg+(b(j)*100): GOTO gOpNext
 
-292 LET j=j+k
-293 GOSUB sRuleBaseOneArg+(b(j)*100)
-298 LET byteCount=byteCount+d(j)
-299 GOTO gOpNext
+306 REM =======> Start Here 1 <=========
 
-300 REM gOpState2
-319 GOTO gOpNext
+308 LET argType=0: LET ruleTotal=5: LET gGetRule=315: REM search for rule based on arg type
+309 IF n$(i,1)="@" THEN LET argType=1: GOTO gGetRule: REM one byte num 
+310 IF n(i)=1 THEN LET argType=2: GOTO gGetRule: REM b,c,d,e,h,l,a
+311 IF n(i)=2 THEN LET argType=5: GOTO gGetRule: REM bc,de,hl,ix,iy
+312 IF n(i)=4 THEN LET argType=3: GOTO gGetRule: REM (hl)
+313 LET argType=4: REM (ix+No),(iy+No)
 
+315 REM gGetRule
+316 LET ruleTotal=4
+317 FOR k=0 TO ruleTotal-1: IF NOT a(j+k)=argType THEN NEXT k
+318 IF k=ruleTotal THEN PRINT "error: arg type not found - "+m$(i): STOP
+
+319 LET j=j+k
+320 GOSUB sRuleBaseOneArg+(b(j)*100)
+321 LET byteCount=byteCount+d(j)
+322 GOTO gOpNext
+
+350 REM gOpState2
+399 GOTO gOpNext
+
+400 REM gFinish
 499 GOTO 9999
 
 500 REM sGetToken(codeLoc) updates codeLoc, sets t$
@@ -175,10 +186,25 @@
 
 1100 REM sRuleBaseOneArg:1
 1101 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
-1199 RETURN
+1148 RETURN
+
+1149 REM =======> Start Here 2 <=========
 
 1200 REM sRuleBaseOneArg:2
-1201 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)
+1202 LET offset=0
+1204 LET lval=(CODE n$(i) - CODE("a")) + 1
+1206 IF lval>0 THEN LET offset=o(lval)*e(j): GOTO 1250: REM RETURN
+1208 LET offset=6*e(j)
+1210 IF n$(i,2)="h" THEN GOTO 1250: REM RETURN
+1212 REM process ix, iy
+1214 LET t$=n$(i): LET idx1=0: LET idx2=0
+1216 LET d$="@": GOSUB sGetDelim: LET idx1=index
+1218 LET d$=")": GOSUB sGetDelim: LET idx2=index
+1220 LET t$=n$(i,idx1 TO idx2): LET num=VAL(t$)
+1222 IF n$(i,3)="x" THEN PRINT "ix=>dd "+STR$(offset)+" "+t$
+1224 IF n$(i,3)="y" THEN PRINT "iy=>fd "+STR$(offset)+" "+t$
+
+1250 PRINT STR$(byteCount)+"  "+m$(i)+"  "+d$(j)+"  offset "+STR$(offset)
 1299 RETURN
 
 1300 REM sRuleBaseOneArg:3
