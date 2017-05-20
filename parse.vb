@@ -1,36 +1,46 @@
-1 REM       add a,b
-2 REM !loop add a,d
-3 REM       add a,a
-4 REM       add a,(hl)
-5 REM       add a,(iy+65535)
-6 REM       add a,7
-7 REM       push a
-8 REM       ret
-9 REM       $end$
+1 REM       ini
+2 REM !loop ldd
+3 REM       nop
+4 REM       nop
+5 REM       di
+6 REM       ei
+7 REM       $end$
 
-11 REM       org @32000
-12 REM       ld bc,@32002
-13 REM       jr !tl1
-14 REM !loop ld b,#5
-15 REM       inc b
-16 REM !tl1  inc c
-17 REM       jr z,!loop
-18 REM       ld (@32113),hl
-19 REM      $end$
+11 REM       add a,b
+12 REM !loop add a,d
+13 REM       add a,a
+14 REM       add a,(hl)
+15 REM       add a,(iy+65535)
+16 REM       add a,7
+17 REM       push a
+18 REM       ret
+19 REM       $end$
 
-25 REM --------------------------------------------------------------
-26 REM   temp variables are i,j,k,x$,x,y$,y
-27 REM --------------------------------------------------------------
+21 REM       org @32000
+22 REM       ld bc,@32002
+23 REM       jr !tl1
+24 REM !loop ld b,#5
+25 REM       inc b
+26 REM !tl1  inc c
+27 REM       jr z,!loop
+28 REM       ld (@32113),hl
+29 REM      $end$
 
+35 REM --------------------------------------------------------------
+36 REM   temp variables are i,j,k,x$,x,y$,y
+37 REM --------------------------------------------------------------
+
+38 REM max labels, lines
+39 LET maxLabels=5: LET maxLines=20
 
 40 REM label, length, position
-41 DIM l$(10,5): DIM l(10): DIM p(10)
+41 DIM l$(maxLabels,5): DIM l(maxLabels): DIM p(maxLabels)
 
 42 REM opcode, length
-43 DIM m$(20,5): DIM m(20)
+43 DIM m$(maxLines,5): DIM m(maxLines)
 
 44 REM operand arg1, length, arg2, length
-45 DIM n$(20,10): DIM n(20): DIM o$(20,10): DIM o(20)
+45 DIM n$(maxLines,10): DIM n(maxLines): DIM o$(maxLines,10): DIM o(maxLines)
 
 46 REM line count, label total
 47 LET lc=1: LET lt=1
@@ -73,23 +83,34 @@
 140 REM ccf cpd cpdr cpi cpir cpl daa di en halt ind indr ini inir ldd lddr ldi ldir neg nop otdr otir outd outi ret rla rlca rld rra rrca rrd scf
 
 180 REM compare strings
-182 DEF FN c(x$,y$)=(x$=y$(TO LEN (x$)))
-
+182 DEF FN c(x$,y$)=(x$=y$(TO LEN(x$)))
 
 200 REM Define lookup level based on opcode and args
 201 REM 0=no args, 1=one arg, 2=two args
 202 LET byteCount=0
-203 LET gOpState0=260: LET gOpState1=280: LET gOpState2=300: LET gOpNext=218: LET gFinish=350
+203 LET gOpState0=260: LET gOpState1=280: LET gOpState2=300: LET gOpNext=248: LET gFinish=350
+204 LET sDebug1=8350
 
-210 FOR i=1 TO lc-1
-212    IF  n(i)=0 THEN GOTO gOpState0
-214    IF  o(i)=0 THEN GOTO gOpState1
-216    GOTO gOpState2
-218 NEXT i
+205 REM GOSUB sDebug1
 
-220 GOTO gFinish
+210 REM max opcodes0, opcode, v1, v2, v3, byte count, hex display
+211 LET max0=21: DIM t$(max0,4): DIM t(max0): DIM u(max0): DIM v(max0): DIM w(max0): DIM w$(max0,8)
+212 FOR i=1 TO max0: READ t$(i), t(i), u(i), v(i), w(i), w$(i): NEXT i
+214 DATA "ccf ",63,0,0,1,"3f   ","cpd ",237,169,0,2,"ed a9","cpdr",237,185,0,2,"ed b9","cpi ",237,161,0,2,"ed a1","cpir",237,177,0,2,"ed b1","cpl ",47,0,0,1,"2f   ","daa ",39,0,0,1,"27   ","di  ",243,0,0,1,"f3   ","ei  ",251,0,0,1,"fb   ","en  ",217,0,0,1,"d9   ","halt",118,0,0,1,"76   ","ind ",237,170,0,2,"ed aa","indr",237,186,0,2,"ed ba","ini ",237,162,0,2,"ed a2","inir",237,178,0,2,"ed b2","ldd ",237,168,0,2,"ed a8","lddr",237,184,0,2,"ed b8","ldi ",237,160,0,2,"ed a0","ldir",237,176,0,2,"ed b0","neg ",237,68,0,2,"ed 44","nop ",0,0,0,1,"00   "
+
+240 FOR i=1 TO lc-1
+242    IF  n(i)=0 THEN GOTO gOpState0
+244    IF  o(i)=0 THEN GOTO gOpState1
+246    GOTO gOpState2
+248 NEXT i
+
+250 GOTO gFinish
 
 260 REM gOpState0
+261 FOR j=1 TO max0: IF NOT (m$(i,TO m(i))=t$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),t$(j))
+262 IF j=max0+1 THEN PRINT "error: opcode not found - "+m$(i): STOP
+263 PRINT STR$(byteCount)+"  "+m$(i)+"  "+w$(j)
+264 LET byteCount=byteCount+w(j)
 279 GOTO gOpNext
 
 280 REM gOpState1
@@ -97,15 +118,6 @@
 
 300 REM gOpState2
 319 GOTO gOpNext
-
-
-350 FOR i=1 TO lc-1
-352    PRINT str$(i)+"["+m$(i)+"]["+n$(i)+"]["+o$(i)+"]"
-354 NEXT i
-355 PRINT "-------------------------------"
-356 FOR i=1 TO lt-1
-358    PRINT "label ["+l$(i)+"] at line ["+str$(p(i))+"]"
-360 NEXT i
 
 499 GOTO 9999
 
@@ -125,5 +137,16 @@
 523    IF t$(k)=d$ THEN LET index=k: RETURN
 524 NEXT k
 525 RETURN
+
+8350 REM sDebug1
+8351 FOR i=1 TO lc-1
+8352    PRINT str$(i)+"["+m$(i)+"]["+n$(i)+"]["+o$(i)+"]"
+8353 NEXT i
+8354 PRINT "--------------------------------"
+8355 FOR i=1 TO lt-1
+8356    PRINT "label ["+l$(i)+"] at line ["+str$(p(i))+"]"
+8357 NEXT i
+8358 PRINT "--------------------------------"
+8359 RETURN
 
 9999 PRINT "finished"
