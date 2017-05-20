@@ -8,16 +8,14 @@
 '   - if no label then opcode must be preceeded by a space
 '   - the operand must not contain spaces
 
-1 REM       org @32000
-2 REM       ld bc,@32002
-3 REM       jr !tl1
-4 REM !loop ld b,#5
-5 REM       inc b
-6 REM !tl1  inc c
-7 REM       jr z,!loop
-8 REM       ld (@32113),hl
-9 REM
-10 REM      $end$
+1 REM       add a,b
+2 REM !loop add a,d
+3 REM       add a,a
+4 REM       add a,(hl)
+5 REM       add a,(iy+5)
+6 REM       add a,7
+7 REM
+8 REM       $end$
 
 25 REM --------------------------------------------------------------
 26 REM   temp variables are i,j,k,x$,x,y$,y
@@ -38,6 +36,9 @@
 
 48 REM define GOTO/GOSUB line constants
 49 LET gState0=100: LET gState1=110: LET gState2=120: LET gState3=130: LET gState4=140: LET sGetToken=500
+
+50 REM compare strings
+52 DEF FN c(x$,y$)=(x$=y$(TO LEN (x$)))
 
 98 REM pass 1
 99 LET codeLoc=(PEEK 23635+(256*PEEK 23636))+5: REM get start location of REM lines
@@ -66,15 +67,49 @@
 134 LET codeLoc=codeLoc+1: GOTO gState3
 
 139 REM pass 2
-140 LET state=4
+140 LET state=4: LET sLookupState0=520
+
+142 REM total rows, table, opcode offset, op type, unused
+143 LET tr=3: DIM t$(tr,4): DIM t(tr): DIM s(tr): DIM u(tr): REM use for u not yet defined
+
+144 FOR i=1 TO tr: READ t$(i),t(i),s(i),u(i): NEXT i: REM IF NOT FN c("*",t$(i)) THEN NEXT i
+145 DATA "add",128,1,0,"cp",184,1,"dec",5,2,0
+
+' define parse level
+' - 0: no offset pattern available                 | dec b
+' - 1: offset pattern available from opcode        | cp b
+' - 2: parse 1st operand value for offset pattern  | add a,b
+146 REM 
 
 150 FOR i=1 TO lc-1
 152    PRINT str$(i)+"["+m$(i)+"]["+n$(i)+"]"
-154 NEXT i
-155 PRINT "-------------------------------"
-156 FOR i=1 TO lt-1
-158    PRINT "label ["+l$(i)+"] at line ["+str$(p(i))+"]"
-160 NEXT i
+154    GOSUB sLookupState0
+156 NEXT i
+
+520 REM sLookupState0(i)
+522 LET gOpState1=530: LET gOpState2=550
+524 FOR j=1 TO tr: IF NOT FN c(m$(i),t$(j)) THEN NEXT j
+526 IF j=tr THEN PRINT "error: opcode not found - "+m$(i): STOP
+527 LET opState=s(j): LET opOffset=t(j)
+528 IF opState=1 THEN GOSUB sLookupState1: IF opState=2 THEN GOSUB sLookupState2
+529 RETURN
+
+530 REM sLookupState1(opOffset) parses form a,reg
+532 
+
+
+
+340 REM Create lookup table, max 4 char opcodes with trailing spaces
+341 REM String compare using len 4
+342 REM Read first char and set state based on letter
+
+350 FOR i=1 TO lc-1
+352    PRINT str$(i)+"["+m$(i)+"]["+n$(i)+"]"
+354 NEXT i
+355 PRINT "-------------------------------"
+356 FOR i=1 TO lt-1
+358    PRINT "label ["+l$(i)+"] at line ["+str$(p(i))+"]"
+360 NEXT i
 
 499 GOTO 9999
 
