@@ -39,7 +39,7 @@
 37 REM   temp vars: (free v,v$,g,h,h$,q,s$)     i,j,k,                            t$,          w$,x$,x,y$,y,z,z$
 38 REM   DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,   u,u$,_,_,
 39 REM --------------------------------------------------------------
- 
+
 40 LET maxLabels=5: LET maxLines=20
 
 41 REM label, length, position
@@ -51,14 +51,47 @@
 45 REM operand arg1, length, arg2, length
 46 DIM n$(maxLines,10): DIM n(maxLines): DIM o$(maxLines,10): DIM o(maxLines)
 
-47 LET lc=1: LET lt=1: REM line count, label total
+49 REM --- create op code look up tables -----------------------------------------------------
+50 REM Define lookup level based on opcode and args: 0=no args, 1=one arg, 2=two args
 
-50 REM --- pass 1 ----------------------------------------------------------------------------
-51 LET codeLoc=(PEEK 23635+(256*PEEK 23636))+5: REM get start location of REM lines
+55 REM total opcodes0, u$=opcode, u=key
+56 LET tot0=36: DIM u$(tot0,4): DIM u(tot0)
+57 FOR i=1 TO tot0: READ u$(i), u(i): NEXT i
+58 DATA "ccf ", 1,"cpd ", 2,"cpdr", 3,"cpi ", 4,"cpir", 5,"cpl ", 6,"daa ", 7,"di  ", 8,"ei  ", 9,"en  ",10,"halt",11,"ind ",12,"indr",13,"ini ",14,"inir",15,"ldd ",16,"lddr",17,"ldi ",18,"ldir",19,"neg ",20,"nop ",21,"otdr",22,"otir",23,"outd",24,"outi",25,"ret ",26,"reti",27,"retn",28,"rla ",29,"rlca",30,"rld ",31,"rra ",32,"rrca",33,"rrd ",34,"scf ",35,"----",36 
 
-54 REM define GOTO/GOSUB line constants
-56 LET gState0=100: LET gState1=110: LET gState2=120: LET gState3=130: LET gState4=140
-58 LET sGetToken=500: LET sGetDelim=520
+60 REM total opcodes1, a$=opcode, a=key
+61 LET tot1=18: DIM a$(tot1,4): DIM a(tot1)
+62 FOR i=1 TO tot1: READ a$(i), a(i): NEXT i
+63 DATA "and ",36,"call",40,"cp  ",41,"dec ",45,"inc ",49,"pop ",53,"push",54,"jp  ",55,"djnz",56,"jr  ",57,"",    58,"",    59,"",    60,"",    61,"",    62,"",    63,"",    64,"----",65 
+
+65 REM total opcodes2, f$=opcode, g$=val, f=key
+66 LET tot2=8: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
+67 FOR i=1 TO tot2: READ f$(i), g$(i), f(i): NEXT i
+68 DATA "adc ","a",  65,"adc ","hl", 69,"add ","a",  70,"add ","ix", 75,"add ","iy", 76,"call","*" , 77,"jr  ","*" , 78,"----","--", 79 
+
+70 REM total keys, b=type, c=rule, d=mcode, e=offset, e$=hex display
+71 LET totK1=78: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
+72 FOR i=1 TO totK1: READ b(i), c(i), d(i), e(i), e$(i): NEXT i
+73 DATA 0,0,63, 0,"3f   ",0,1,169,0,"ed a9",0,1,185,0,"ed b9",0,1,161,0,"ed a1",0,1,177,0,"ed b1",0,0,47, 0,"2f   ",0,0,39, 0,"27   ",0,0,243,0,"f3   ",0,0,251,0,"fb   ",0,0,217,0,"d9   ",0,0,118,0,"76   ",0,1,170,0,"ed aa",0,1,186,0,"ed ba",0,1,162,0,"ed a2",0,1,178,0,"ed b2",0,1,168,0,"ed a8",0,1,184,0,"ed b8",0,1,160,0,"ed a0",0,1,176,0,"ed b0",0,1,68, 0,"ed 44",0,0,0,  0,"00   ",0,1,187,0,"ed bb",0,1,179,0,"ed b3",0,1,171,0,"ed ab",0,1,163,0,"ed a3",0,0,201,0,"c9   ",0,1,77, 0,"ed 4d",0,1,69, 0,"ed 45",0,1,23, 0,"17   ",0,0,7,  0,"07   ",0,1,111,0,"ed 6f",0,0,31, 0,"1f   ",0,0,15, 0,"0f   ",0,1,103,0,"ed 67",0,0,55, 0,"37   "
+74 DATA 1,2,230,0,"e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",1,2,254,0, "fe N    ",2,3,184,1, "b8 +    ",3,3,184,0, "be      ",4,3,184,0, "dd be No",2,3,5,  8, "05 +    ", 3,3,53, 0, "35      ",4,3,53, 0, "dd 35 No",5,4,11, 16,"0b +    ",2,3,4,  8, "04 +    ",3,3,52, 0, "34      ",4,3,52, 0, "dd 34 No",5,4,3,  16,"03 +    ",5,4,193,16,"c1 +    ",5,4,197,16,"c5 +    ",1,4,195,0, "c3 N N  ", 1,6,10 ,0, "10      ",1,6,24 ,0, "18      ",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   ""
+75 DATA 1,2,206,0,"ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + KW ",5,7,009,16,"dd 09 + ",5,7,009,16,"fd 09 + ",9,5,204,16,"cc N N  ",9,6,0,16,  "jr No   "
+
+80 REM 8 bit reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
+81 DIM r(9): FOR k=1 TO 9: READ r(k): NEXT k
+82 DATA 7,0,1,2,3,0,0,4,5
+
+83 REM 16 bit reg offsets: a/f=3,b/c=0,-,d/e=1,-,-,-,h/l=2 | lookup 1st char | ix,iy,sp seperate
+84 DIM s(8): FOR k=1 TO 8: READ s(k): NEXT k
+85 DATA 3,0,0,1,0,0,0,2
+
+90 REM --- pass 1: read op code data, parse into struct --------------------------------------
+
+91 LET lc=1: LET lt=1: REM line count, label total
+92 LET codeLoc=(PEEK 23635+(256*PEEK 23636))+5: REM get start location of REM lines
+
+95 REM define GOTO/GOSUB line constants
+96 LET gState0=100: LET gState1=110: LET gState2=120: LET gState3=130: LET gState4=140
+97 LET sGetToken=500: LET sGetDelim=520
 
 100 LET state=0: LET ch=PEEK codeLoc
 102 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState1
@@ -86,52 +119,11 @@
 132 IF  ch=13 THEN LET codeLoc=codeLoc+6: LET lc=lc+1: GOTO gState0
 134 LET codeLoc=codeLoc+1: GOTO gState3
 
-135 REM --- pass 2 ---------------------------------------------------------------------------
-
-140 REM ccf cpd cpdr cpi cpir cpl daa di en halt ind indr ini inir ldd lddr ldi ldir neg nop otdr otir outd outi ret rla rlca rld rra rrca rrd scf
-
-180 REM compare strings
-182 DEF FN c(x$,y$)=(x$=y$(TO LEN(x$)))
-
-200 REM Define lookup level based on opcode and args
-201 REM 0=no args, 1=one arg, 2=two args
+135 REM --- pass 2: look up op code data, generate machine code ------------------------------
 202 LET byteCount=0
-203 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350: LET gFinish=400
+203 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350: LET gFinish=9999
 204 LET sGetRule=550: LET sGetArgType=530: LET sRuleBase=1000
-205 LET sPrintResult=8000: LET sPrintError=8050: LET sDebug1=8350
-
-206 REM GOSUB sDebug1
-
-209 REM total opcodes0, u$=opcode, u=key
-211 LET tot0=36: DIM u$(tot0,4): DIM u(tot0)
-212 FOR i=1 TO tot0: READ u$(i), u(i): NEXT i
-214 DATA "ccf ", 1,"cpd ", 2,"cpdr", 3,"cpi ", 4,"cpir", 5,"cpl ", 6,"daa ", 7,"di  ", 8,"ei  ", 9,"en  ",10,"halt",11,"ind ",12,"indr",13,"ini ",14,"inir",15,"ldd ",16,"lddr",17,"ldi ",18,"ldir",19,"neg ",20,"nop ",21,"otdr",22,"otir",23,"outd",24,"outi",25,"ret ",26,"reti",27,"retn",28,"rla ",29,"rlca",30,"rld ",31,"rra ",32,"rrca",33,"rrd ",34,"scf ",35,"----",36 
-
-215 REM total opcodes1, a$=opcode, a=key
-216 LET tot1=18: DIM a$(tot1,4): DIM a(tot1)
-217 FOR i=1 TO tot1: READ a$(i), a(i): NEXT i
-218 DATA "and ",36,"call",40,"cp  ",41,"dec ",45,"inc ",49,"pop ",53,"push",54,"jp  ",55,"djnz",56,"jr  ",57,"",    58,"",    59,"",    60,"",    61,"",    62,"",    63,"",    64,"----",65 
-
-219 REM total opcodes2, f$=opcode, g$=val, f=key
-220 LET tot2=8: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
-221 FOR i=1 TO tot2: READ f$(i), g$(i), f(i): NEXT i
-222 DATA "adc ","a",  65,"adc ","hl", 69,"add ","a",  70,"add ","ix", 75,"add ","iy", 76,"call","*" , 77,"jr  ","*" , 78,"----","--", 79 
-
-223 REM total keys, b=type, c=rule, d=mcode, e=offset, e$=hex display
-224 LET totK1=78: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
-225 FOR i=1 TO totK1: READ b(i), c(i), d(i), e(i), e$(i): NEXT i
-
-226 DATA 0,0,63, 0,"3f   ",0,1,169,0,"ed a9",0,1,185,0,"ed b9",0,1,161,0,"ed a1",0,1,177,0,"ed b1",0,0,47, 0,"2f   ",0,0,39, 0,"27   ",0,0,243,0,"f3   ",0,0,251,0,"fb   ",0,0,217,0,"d9   ",0,0,118,0,"76   ",0,1,170,0,"ed aa",0,1,186,0,"ed ba",0,1,162,0,"ed a2",0,1,178,0,"ed b2",0,1,168,0,"ed a8",0,1,184,0,"ed b8",0,1,160,0,"ed a0",0,1,176,0,"ed b0",0,1,68, 0,"ed 44",0,0,0,  0,"00   ",0,1,187,0,"ed bb",0,1,179,0,"ed b3",0,1,171,0,"ed ab",0,1,163,0,"ed a3",0,0,201,0,"c9   ",0,1,77, 0,"ed 4d",0,1,69, 0,"ed 45",0,1,23, 0,"17   ",0,0,7,  0,"07   ",0,1,111,0,"ed 6f",0,0,31, 0,"1f   ",0,0,15, 0,"0f   ",0,1,103,0,"ed 67",0,0,55, 0,"37   "
-227 DATA 1,2,230,0,"e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",1,2,254,0, "fe N    ",2,3,184,1, "b8 +    ",3,3,184,0, "be      ",4,3,184,0, "dd be No",2,3,5,  8, "05 +    ", 3,3,53, 0, "35      ",4,3,53, 0, "dd 35 No",5,4,11, 16,"0b +    ",2,3,4,  8, "04 +    ",3,3,52, 0, "34      ",4,3,52, 0, "dd 34 No",5,4,3,  16,"03 +    ",5,4,193,16,"c1 +    ",5,4,197,16,"c5 +    ",1,4,195,0, "c3 N N  ", 1,6,10 ,0, "10      ",1,6,24 ,0, "18      ",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   ""
-228 DATA 1,2,206,0,"ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + KW ",5,7,009,16,"dd 09 + ",5,7,009,16,"fd 09 + ",9,5,204,16,"cc N N  ",9,6,0,16,  "jr No   "
-
-229 REM 8 bit reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
-230 DIM r(9): FOR k=1 TO 9: READ r(k): NEXT k
-231 DATA 7,0,1,2,3,0,0,4,5
-
-232 REM 16 bit reg offsets: a/f=3,b/c=0,-,d/e=1,-,-,-,h/l=2 | lookup 1st char | ix,iy,sp seperate
-233 DIM s(8): FOR k=1 TO 8: READ s(k): NEXT k
-234 DATA 3,0,0,1,0,0,0,2
+205 LET sPrintResult=8000: LET sPrintError=8050
 
 235 FOR i=1 TO lc-1
 236    IF n(i)=0 THEN GOTO gOpState0: REM no args
@@ -171,8 +163,9 @@
 398 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
 399 GOTO gOpNext
 
-400 REM gFinish
-499 GOTO 9999
+498 GOTO gFinish
+
+499 REM --- subroutine section ---------------------------------------------------------------
 
 500 REM sGetToken(codeLoc) updates codeLoc, sets t$
 502 LET t$=""
@@ -209,6 +202,8 @@
 558 IF  k=ruleCount THEN LET w$="error: arg type not found": GOSUB sPrintError: STOP
 560 LET key=key+k
 562 RETURN
+
+989 REM --- rule definitions -----------------------------------------------------------------
 
 990 REM - rule 0: <op>           | size=1 | no prefix
 991 REM - rule 1: ed(237) <op> + | size=2 | prefix +offset
@@ -314,6 +309,8 @@
 1798 LET byteCount=byteCount+bytes
 1799 RETURN
 
+7999 REM --- message output -------------------------------------------------------------------
+
 8000 REM sPrintResult(in:i, in:w$, in:argType, in:key, in:bytes)
 8015 PRINT STR$(byteCount);
 8020 PRINT TAB  2;m$(i,TO m(i));
@@ -328,16 +325,5 @@
 8050 REM sPrintError(in:i, in:w$)
 8052 PRINT w$+"|"+m$(i,TO m(i))+"|"+n$(i,TO n(i))+"|"+o$(i,TO o(i))
 8099 RETURN
-
-8350 REM sDebug1(in:lc)
-8351 FOR i=1 TO lc-1
-8352    PRINT str$(i)+"["+m$(i)+"]["+n$(i)+"]["+o$(i)+"]"
-8353 NEXT i
-8354 PRINT "--------------------------------"
-8355 FOR i=1 TO lt-1
-8356    PRINT "label ["+l$(i)+"] at line ["+str$(p(i))+"]"
-8357 NEXT i
-8358 PRINT "--------------------------------"
-8359 RETURN
 
 9999 PRINT "finished"
