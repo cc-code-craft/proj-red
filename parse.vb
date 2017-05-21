@@ -40,7 +40,7 @@
 38 REM   DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,   u,u$,_,_,
 39 REM --------------------------------------------------------------
 
-40 LET maxLabels=5: LET maxLines=20
+40 LET maxLabels=5: LET maxLines=20: LET maxCodeBytes=1024
 
 41 REM label, length, position
 42 DIM l$(maxLabels,5): DIM l(maxLabels): DIM p(maxLabels)
@@ -50,6 +50,9 @@
 
 45 REM operand arg1, length, arg2, length
 46 DIM n$(maxLines,10): DIM n(maxLines): DIM o$(maxLines,10): DIM o(maxLines)
+
+47 REM machine code
+48 DIM v(maxCodeBytes)
 
 49 REM --- create op code look up tables -----------------------------------------------------
 50 REM Define lookup level based on opcode and args: 0=no args, 1=one arg, 2=two args
@@ -84,30 +87,34 @@
 84 DIM s(8): FOR k=1 TO 8: READ s(k): NEXT k
 85 DATA 3,0,0,1,0,0,0,2
 
-90 REM --- pass 1: read op code data, parse into struct --------------------------------------
+90 REM --- step 1: read op code data, parse into struct --------------------------------------
 
-91 LET lc=1: LET lt=1: REM line count, label total
+91 LET byteCount=0: LET lc=1: LET lt=1: REM byte count, line count, label total
 92 LET codeLoc=(PEEK 23635+(256*PEEK 23636))+5: REM get start location of REM lines
 
-95 REM define GOTO/GOSUB line constants
-96 LET gState0=100: LET gState1=110: LET gState2=120: LET gState3=130: LET gState4=140
-97 LET sGetToken=500: LET sGetDelim=520
+93 REM define GOTO/GOSUB line constants
+94 LET gState0=100: LET gState1=110: LET gState2=120: LET gState3=130: LET gState4=140: LET gState5=150: LET gFinish=9999
+95 LET sGetToken=500: LET sGetDelim=520: LET sLookupOpCode=200
+
+96 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350
+97 LET sGetRule=550: LET sGetArgType=530: LET sRuleBase=1000
+98 LET sPrintResult=8000: LET sPrintError=8050
 
 100 LET state=0: LET ch=PEEK codeLoc
 102 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState1
 104 IF  ch=13 THEN LET codeLoc=codeLoc+6: GOTO gState0
 106 IF  ch=36 THEN GOTO gState4: REM $end$
-108 GOSUB sGetToken: LET l$(lt)=t$: LET l(lt)=LEN(t$): LET p(lt)=lc: LET lt=lt+1: GOTO gState1
+108 GOSUB sGetToken: LET l$(lt)=t$: LET l(lt)=LEN(t$): LET p(lt)=byteCount: LET lt=lt+1: GOTO gState1
 
 110 LET state=1: LET ch=PEEK codeLoc
 112 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState1
 114 IF  ch=13 THEN PRINT "error: no opcode after label": STOP
-116 IF  ch=36 THEN GOTO gState4: REM $end$
+116 IF  ch=36 THEN GOTO gState5: REM $end$
 118 GOSUB sGetToken: LET m$(lc)=t$: LET m(lc)=LEN(t$): GOTO gState2
 
 120 LET state=2: LET ch=PEEK codeLoc
 122 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState2
-123 IF  ch=13 THEN LET codeLoc=codeLoc+6: LET lc=lc+1: GOTO gState0
+123 IF  ch=13 THEN LET codeLoc=codeLoc+6: GOTO gState4
 124 IF  ch=36 THEN PRINT "error: unexpected $end$ after opcode": STOP
 125 IF  ch=59 THEN LET codeLoc=codeLoc+1: GOTO gState3
 126 GOSUB sGetToken: LET index=0: LET d$=",": GOSUB sGetDelim
@@ -116,22 +123,28 @@
 129 LET o$(lc)=t$(index+1 TO): LET o(lc)=LEN(t$(index+1 TO)): GOTO gState3
 
 130 LET state=3: LET ch=PEEK codeLoc
-132 IF  ch=13 THEN LET codeLoc=codeLoc+6: LET lc=lc+1: GOTO gState0
+132 IF  ch=13 THEN LET codeLoc=codeLoc+6: GOTO gState4
 134 LET codeLoc=codeLoc+1: GOTO gState3
 
-135 REM --- pass 2: look up op code data, generate machine code ------------------------------
-202 LET byteCount=0
-203 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350: LET gFinish=9999
-204 LET sGetRule=550: LET sGetArgType=530: LET sRuleBase=1000
-205 LET sPrintResult=8000: LET sPrintError=8050
+140 LET state=4
+142 GOSUB sLookupOpCode
+149 LET lc=lc+1: GOTO gState0
 
-235 FOR i=1 TO lc-1
-236    IF n(i)=0 THEN GOTO gOpState0: REM no args
-237    IF o(i)=0 THEN GOTO gOpState1: REM one arg
-238    GOTO gOpState2: REM two args
-240 NEXT i: REM gOpNext
+150 LET state=5: REM pass2: resolve label jumps
+152 REM GOSUB sCalcLabelJumps
 
-245 GOTO gFinish
+199 GOTO gFinish
+
+200 REM --- step 2: look up op code data, generate machine code ------------------------------
+
+234 REM sLookupOpCode(in:lc, in:m$(), in:m(), in:n$(), in:n(), in:o$(), in:o()) updates v()
+235 LET i=lc
+236 IF n(i)=0 THEN GOTO gOpState0: REM no args
+237 IF o(i)=0 THEN GOTO gOpState1: REM one arg
+238 GOTO gOpState2: REM two args
+
+240 REM gOpNext
+245 RETURN
 
 250 REM --- gOpState0, no args ---------------------
 251 FOR j=1 TO tot0: IF NOT (m$(i,TO m(i))=u$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),u$(j))
