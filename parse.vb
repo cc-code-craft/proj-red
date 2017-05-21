@@ -2,13 +2,13 @@
 2 REM !loop ldd
 3 REM       nop
 4 REM       dec d
-5 REM       and e
-6 REM       and @12
+5 REM       jr @5
+6 REM       djnz @12
 8 REM       and (ix+@125)
 9 REM       and (hl)
 10 REM      add a,b
 11 REM       add a,a
-12 REM !lp2  add a,d
+12 REM !lp2  jr nz,@22
 13 REM       add a,ix
 14 REM       add a,(hl)
 15 REM       add a,(iy+@35)
@@ -108,21 +108,22 @@
 214 DATA "ccf ", 1,"cpd ", 2,"cpdr", 3,"cpi ", 4,"cpir", 5,"cpl ", 6,"daa ", 7,"di  ", 8,"ei  ", 9,"en  ",10,"halt",11,"ind ",12,"indr",13,"ini ",14,"inir",15,"ldd ",16,"lddr",17,"ldi ",18,"ldir",19,"neg ",20,"nop ",21,"otdr",22,"otir",23,"outd",24,"outi",25,"ret ",26,"reti",27,"retn",28,"rla ",29,"rlca",30,"rld ",31,"rra ",32,"rrca",33,"rrd ",34,"scf ",35,"----",36 
 
 215 REM total opcodes1, a$=opcode, a=key
-216 LET tot1=4: DIM a$(tot1,4): DIM a(tot1)
+216 LET tot1=18: DIM a$(tot1,4): DIM a(tot1)
 217 FOR i=1 TO tot1: READ a$(i), a(i): NEXT i
-218 DATA "and ",36,"push",40,"dec ",41,"----",45
+218 DATA "and ",36,"call",40,"cp  ",41,"dec ",45,"inc ",49,"pop ",53,"push",54,"jp  ",55,"djnz",56,"jr  ",57,"",    58,"",    59,"",    60,"",    61,"",    62,"",    63,"",    64,"----",65 
 
 219 REM total opcodes2, f$=opcode, g$=val, f=key
-220 LET tot2=7: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
+220 LET tot2=8: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
 221 FOR i=1 TO tot2: READ f$(i), g$(i), f(i): NEXT i
-222 DATA "adc ","a",  45,"adc ","hl", 49,"add ","a",  50,"add ","ix", 55,"add ","iy", 56,"call","*" , 57,"----","--", 58 
+222 DATA "adc ","a",  65,"adc ","hl", 69,"add ","a",  70,"add ","ix", 75,"add ","iy", 76,"call","*" , 77,"jr  ","*" , 78,"----","--", 79 
 
 223 REM total keys, b=type, c=rule, d=mcode, e=offset, e$=hex display
-224 LET totK1=57: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
+224 LET totK1=79: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
 225 FOR i=1 TO totK1: READ b(i), c(i), d(i), e(i), e$(i): NEXT i
+
 226 DATA 0,0,63, 0,"3f   ",0,1,169,0,"ed a9",0,1,185,0,"ed b9",0,1,161,0,"ed a1",0,1,177,0,"ed b1",0,0,47, 0,"2f   ",0,0,39, 0,"27   ",0,0,243,0,"f3   ",0,0,251,0,"fb   ",0,0,217,0,"d9   ",0,0,118,0,"76   ",0,1,170,0,"ed aa",0,1,186,0,"ed ba",0,1,162,0,"ed a2",0,1,178,0,"ed b2",0,1,168,0,"ed a8",0,1,184,0,"ed b8",0,1,160,0,"ed a0",0,1,176,0,"ed b0",0,1,68, 0,"ed 44",0,0,0,  0,"00   ",0,1,187,0,"ed bb",0,1,179,0,"ed b3",0,1,171,0,"ed ab",0,1,163,0,"ed a3",0,0,201,0,"c9   ",0,1,77, 0,"ed 4d",0,1,69, 0,"ed 45",0,1,23, 0,"17   ",0,0,7,  0,"07   ",0,1,111,0,"ed 6f",0,0,31, 0,"1f   ",0,0,15, 0,"0f   ",0,1,103,0,"ed 67",0,0,55, 0,"37   "
-227 DATA 1,2,230,0, "e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",5,4,197,16,"05 +    ",2,3,5,  8, "05 +    ",3,3,35, 0, "35      ",4,3,35, 0, "dd 35 No",5,4,11, 16,"0b +    "
-228 DATA 1,2,206,0, "ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + !!!",5,6,009,16,"dd 09 + ",5,6,009,16,"fd 09 + ",9,5,204,16,"cc N N  "
+227 DATA 1,2,230,0,"e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",1,2,254,0, "fe N    ",2,3,184,1, "b8 +    ",3,3,184,0, "be      ",4,3,184,0, "dd be No",2,3,5,  8, "05 +    ", 3,3,53, 0, "35      ",4,3,53, 0, "dd 35 No",5,4,11, 16,"0b +    ",2,3,4,  8, "04 +    ",3,3,52, 0, "34      ",4,3,52, 0, "dd 34 No",5,4,3,  16,"03 +    ",5,4,193,16,"c1 +    ",5,4,197,16,"c5 +    ",1,4,195,0, "c3 N N  ", 1,6,10 ,0, "10      ",1,6,24 ,0, "18      ",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   ""
+228 DATA 1,2,206,0,"ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + KW ",5,7,009,16,"dd 09 + ",5,7,009,16,"fd 09 + ",9,5,204,16,"cc N N  ",9,6,0,16,  "jr No   "
 
 229 REM 8 bit reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
 230 DIM r(9): FOR k=1 TO 9: READ r(k): NEXT k
@@ -159,12 +160,14 @@
 322 GOTO gOpNext
 
 350 REM --- gOpState2, two args ---------------------
-351 FOR j=1 TO tot2: IF NOT ( m$(i,TO m(i))=f$(j,TO m(i)) AND n$(i,TO n(i))=g$(j,TO n(i))) THEN NEXT j
-352 IF j=tot2+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
+351 FOR j=1 TO tot2: IF NOT (m$(i,TO m(i))=f$(j,TO m(i))) THEN NEXT j
+352 IF  g$(j,1)="*" THEN GOTO 356: REM match wildcard *
+353 FOR j=j TO tot2: IF NOT (n$(i,TO n(i))=g$(j,TO n(i))) THEN NEXT j: REM match arg 1
+354 IF  j=tot2+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
 
-353 LET key=f(j): LET ruleCount=f(j+1)-f(j): LET z$=o$(i,TO o(i))
-354 GOSUB sGetRule: REM get rule to process arg2
-    
+356 LET key=f(j): LET ruleCount=f(j+1)-f(j): LET z$=o$(i,TO o(i))
+358 GOSUB sGetRule: REM get rule to process arg2
+
 398 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
 399 GOTO gOpNext
 
@@ -213,6 +216,7 @@
 993 REM - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
 994 REM - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
 995 REM - rule 5: <op> N N       | size=3
+995 REM - rule 6: <op:jr> No     | size=2 | relative jump +/-127 bytes
 
 1000 REM sRuleBase:0 <op> | size=1 | no prefix
 1002 LET w$=STR$(d(key)): LET bytes=1
@@ -273,11 +277,42 @@
 1498 LET byteCount=byteCount+bytes
 1499 RETURN
 
-1500 REM sRuleBase:5
+1500 REM sRuleBase:5 <op> N N | size=3 -> high, low byte order?
 1501 LET w$="r5": LET bytes=1: REM use key for lookup
+1505 REM IF <256 THEN write 1 byte, else write h,l bytes
 1597 GOSUB sPrintResult
 1598 LET byteCount=byteCount+bytes
 1599 RETURN
+
+1600 REM sRuleBase:6 <op:jr> No | size=2 -> calc +/-bytes to jump
+1602 LET bytes=2: LET w$=""
+
+1604 REM All relative jumps are calculated by rule 6 (z$=No)
+1605 REM - Add parse lookups for 1 and 2 arg op codes
+1606 REM     "djnz",56,     |56| 1,6,10,0,"10" -> 1 arg
+1607 REM     "jr  ",57,     |57| 1,6,24,0,"18" -> 1 arg
+1608 REM     "jr  ","*",78, |77| 9,6,0,16,""   -> 2 args
+1609 REM - Check arg count before determining machine code
+
+1610 IF o(i)=0 THEN LET mcode=d(key): GOTO 1642: REM one arg
+1612 IF n$(i,TO n(i))="nz" THEN LET mcode=32: GOTO 1642: REM two args
+1614 IF n$(i,TO n(i))="z"  THEN LET mcode=40: GOTO 1642
+1616 IF n$(i,TO n(i))="nc" THEN LET mcode=48: GOTO 1642
+1618 IF n$(i,TO n(i))="c"  THEN LET mcode=56: GOTO 1642
+
+1620 REM ==> if z$ is a label then calculate label jump (+/-127) <==
+
+1642 LET w$=w$+STR$(mcode)+z$
+
+1697 GOSUB sPrintResult
+1698 LET byteCount=byteCount+bytes
+1699 RETURN
+
+1700 REM rule 7
+1701 LET w$="r7": LET bytes=1: REM use key for lookup
+1797 GOSUB sPrintResult
+1798 LET byteCount=byteCount+bytes
+1799 RETURN
 
 8000 REM sPrintResult(in:i, in:w$, in:argType, in:key, in:bytes)
 8015 PRINT STR$(byteCount);
