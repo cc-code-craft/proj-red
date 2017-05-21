@@ -97,7 +97,7 @@
 201 REM 0=no args, 1=one arg, 2=two args
 202 LET byteCount=0
 203 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350: LET gFinish=400
-204 LET sGetArgType=530: LET sRuleBase=1000
+204 LET sGetRule=550: LET sGetArgType=530: LET sRuleBase=1000
 205 LET sPrintResult=8000: LET sPrintError=8050: LET sDebug1=8350
 
 206 REM GOSUB sDebug1
@@ -152,16 +152,8 @@
 301 FOR j=1 TO tot1: IF NOT (m$(i,TO m(i))=a$(j,TO m(i))) THEN NEXT j
 302 IF j=tot1+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
 
-305 IF b(a(j))=999 THEN GOTO 320: REM match any arg type
-
-307 REM get rule to process arg1
-308 LET z$=n$(i,TO n(i))
-309 LET argType=0: GOSUB sGetArgType
-
-316 LET rules=a(j+1)-a(j): LET key=a(j)
-317 FOR k=0 TO rules-1: IF NOT b(key+k)=argType THEN NEXT k
-318 IF k=rules THEN LET w$="error: arg type not found": GOSUB sPrintError: STOP
-319 LET key=key+k
+303 LET key=a(j): LET ruleCount=a(j+1)-a(j): LET z$=n$(i,TO n(i))
+304 GOSUB sGetRule: REM get rule to process arg1
 
 320 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
 322 GOTO gOpNext
@@ -170,18 +162,8 @@
 351 FOR j=1 TO tot2: IF NOT ( m$(i,TO m(i))=f$(j,TO m(i)) AND n$(i,TO n(i))=g$(j,TO n(i))) THEN NEXT j
 352 IF j=tot2+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
 
-355 IF b(f(j))=999 THEN GOTO 365: REM match any arg type
-
-357 REM get rule to process arg2
-358 LET z$=o$(i,TO o(i))
-359 LET argType=0: GOSUB sGetArgType
-
-360 REM ============> Create sGetRule <===============
-
-366 LET rules=f(j+1)-f(j): LET key=f(j)
-367 FOR k=0 TO rules-1: IF NOT b(key+k)=argType THEN NEXT k
-368 IF k=rules THEN LET w$="error: arg type not found": GOSUB sPrintError: STOP
-369 LET key=key+k
+353 LET key=f(j): LET ruleCount=f(j+1)-f(j): LET z$=o$(i,TO o(i))
+354 GOSUB sGetRule: REM get rule to process arg2
     
 398 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
 399 GOTO gOpNext
@@ -216,6 +198,14 @@
 535 IF  length=4 THEN LET argType=3: RETURN: REM (hl)
 536 LET argType=4: REM (ix+No),(iy+No)
 537 RETURN
+
+550 REM sGetRule(in:key, in:ruleCount, in:z$) set key to index of rule to apply
+552 IF  b(key)=9 THEN RETURN: REM match any arg type: only one rule used
+554 LET argType=0: GOSUB sGetArgType
+556 FOR k=0 TO ruleCount-1: IF NOT b(key+k)=argType THEN NEXT k
+558 IF  k=ruleCount THEN LET w$="error: arg type not found": GOSUB sPrintError: STOP
+560 LET key=key+k
+562 RETURN
 
 990 REM - rule 0: <op>           | size=1 | no prefix
 991 REM - rule 1: ed(237) <op> + | size=2 | prefix +offset
