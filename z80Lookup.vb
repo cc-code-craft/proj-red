@@ -8,8 +8,8 @@
 '
 'Z80 Opcodes
 ' - N  = 1 byte  (0-255)
-' - No = 1 byte  (0- +/-127)
-' - NN = 2 bytes (0-255)h (0-255)l stored most significant byte first
+' - No = 1 byte  (-126 to +129) signed
+' - NN = 2 bytes (0-255)l (0-255)h low order byte stored first
 
 ' adc add and bit call ccf cp cpd cpdr cpi cpir cpl daa dec di djnz ei ex en halt im in inc ind indr ini inir jp jr ld ldd lddr ldi ldir neg nop or otdr otir outd outi out pop push res ret rl rla rlc rlca rld rr rra rrc rrca rrd rst sbc scf set sla sra srl sub xor
 
@@ -133,8 +133,9 @@
 ' - rule 2: <op> N         | size=2 
 ' - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
 ' - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
-' - rule 5: <op> N N       | size=3
-' - rule 6: <op> No        | size=2 | djnz,jr => calc rel val
+' - rule 5: <op> N N       | size=3 | low,high byte order, immediate extended address
+' - rule 6: <op:jr,djnz> No| size=2 | relative jump -126 to +129 (1 byte signed)
+
 ' ------------------------------------------------------------------
 ' - rule 9: im 0,1,2
 ' - rule 10: jp (hl),(ix),(iy)
@@ -257,7 +258,7 @@
 '       dec iy            fd 2b       
 '       dec sp            3b       59    +16
 '
-'       djnz No (+/-128)  10 No (+/-128)
+'       djnz No (+129,-126)  10 No (+129,-126)
 '
 '       im 0              ed 46
 '       im 1              ed 56

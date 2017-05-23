@@ -1,58 +1,47 @@
 1 REM       ini
-2 REM !loop ldd
+2 REM loop  ldd
 3 REM       nop
-4 REM       dec d
+4 REM lp1   dec d
 5 REM       jr @5
-6 REM       djnz @12
+6 REM       djnz !lp3
 8 REM       and (ix+@125)
 9 REM       and (hl)
 10 REM      add a,b
 11 REM       add a,a
-12 REM !lp2  jr nz,@22
+12 REM lp2   jr nz,!loop
 13 REM       add a,ix
-14 REM       add a,(hl)
+14 REM       jp !lp1
 15 REM       add a,(iy+@35)
-16 REM       add a,@14
+16 REM lp3   add a,@14
 17 REM       push ix
 18 REM       dec de
 19 REM       $end$
-
-20 REM       ret
-21 REM       org @32000
-22 REM       ld bc,@32002
-23 REM       jr !tl1
-24 REM !loop ld b,#5
-25 REM       inc b
-26 REM !tl1  inc c
-27 REM       jr z,!loop
-28 REM       ld (@32113),hl
-29 REM      $end$
 
 30 REM Assumptions on code format
 31 REM  - [label] [opcode] [operand] [comment]
 32 REM  - fields are seperated by at least one space
 33 REM  - if no label then opcode must be preceeded by a space
-34 REM  - the operand must not contain spaces
-35 REM  - labels prefixed by '!', numbers by '@' and must be decimal
+34 REM  - the operand must not contain spaces; labels defined only once
+35 REM  - numbers are decimal, prefixed by '@', labels (as args) prefixed by "!"
 
-36 REM --------------------------------------------------------------
-37 REM   temp vars: (free v,v$,g,h,h$,q,s$)     i,j,k,                            t$,          w$,x$,x,y$,y,z,z$
-38 REM   DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,   u,u$,_,_,
-39 REM --------------------------------------------------------------
+36 REM temp vars: (free g,h$,s$)              i,j,k,                            t$,         w$,x$,x,y$,y,z,z$
+37 REM DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,   u,u$,_,_,
 
-40 LET maxLabels=5: LET maxLines=20: LET maxCodeBytes=1024
+38 LET maxLabels=5: LET maxLines=20: LET maxCodeBytes=1024: LET byteCount=0: LET orgAddress=32767
 
-41 REM label, length, position
-42 DIM l$(maxLabels,5): DIM l(maxLabels): DIM p(maxLabels)
+39 REM label, length, byte position, label total, label index
+40 DIM l$(maxLabels,5): DIM l(maxLabels): DIM p(maxLabels): LET lt=1: LET li=0
+41 DIM v$(maxLabels,5): DIM v(maxLabels): DIM q(maxLabels): DIM h(maxLabels): LET lpt=1: LET lpi=0: LET lpa=0: REM label pending table
+42 REM label name, byte position, arg type 1: 1 byte rel signed (No +129 to –126), 2 bytes abs from orgAddress (N N), lp total, lp index
 
-43 REM opcode, length
-44 DIM m$(maxLines,5): DIM m(maxLines)
+43 REM opcode, length, line count
+44 DIM m$(maxLines,5): DIM m(maxLines): LET lc=1
 
 45 REM operand arg1, length, arg2, length
 46 DIM n$(maxLines,10): DIM n(maxLines): DIM o$(maxLines,10): DIM o(maxLines)
 
-47 REM machine code
-48 DIM v(maxCodeBytes)
+47 REM machine code, index
+48 DIM w(maxCodeBytes): LET mi=byteCount+1
 
 49 REM --- create op code look up tables -----------------------------------------------------
 50 REM Define lookup level based on opcode and args: 0=no args, 1=one arg, 2=two args
@@ -76,7 +65,7 @@
 71 LET totK1=78: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
 72 FOR i=1 TO totK1: READ b(i), c(i), d(i), e(i), e$(i): NEXT i
 73 DATA 0,0,63, 0,"3f   ",0,1,169,0,"ed a9",0,1,185,0,"ed b9",0,1,161,0,"ed a1",0,1,177,0,"ed b1",0,0,47, 0,"2f   ",0,0,39, 0,"27   ",0,0,243,0,"f3   ",0,0,251,0,"fb   ",0,0,217,0,"d9   ",0,0,118,0,"76   ",0,1,170,0,"ed aa",0,1,186,0,"ed ba",0,1,162,0,"ed a2",0,1,178,0,"ed b2",0,1,168,0,"ed a8",0,1,184,0,"ed b8",0,1,160,0,"ed a0",0,1,176,0,"ed b0",0,1,68, 0,"ed 44",0,0,0,  0,"00   ",0,1,187,0,"ed bb",0,1,179,0,"ed b3",0,1,171,0,"ed ab",0,1,163,0,"ed a3",0,0,201,0,"c9   ",0,1,77, 0,"ed 4d",0,1,69, 0,"ed 45",0,1,23, 0,"17   ",0,0,7,  0,"07   ",0,1,111,0,"ed 6f",0,0,31, 0,"1f   ",0,0,15, 0,"0f   ",0,1,103,0,"ed 67",0,0,55, 0,"37   "
-74 DATA 1,2,230,0,"e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",1,2,254,0, "fe N    ",2,3,184,1, "b8 +    ",3,3,184,0, "be      ",4,3,184,0, "dd be No",2,3,5,  8, "05 +    ", 3,3,53, 0, "35      ",4,3,53, 0, "dd 35 No",5,4,11, 16,"0b +    ",2,3,4,  8, "04 +    ",3,3,52, 0, "34      ",4,3,52, 0, "dd 34 No",5,4,3,  16,"03 +    ",5,4,193,16,"c1 +    ",5,4,197,16,"c5 +    ",1,4,195,0, "c3 N N  ", 1,6,10 ,0, "10      ",1,6,24 ,0, "18      ",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   ""
+74 DATA 1,2,230,0,"e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",1,2,254,0, "fe N    ",2,3,184,1, "b8 +    ",3,3,184,0, "be      ",4,3,184,0, "dd be No",2,3,5,  8, "05 +    ", 3,3,53, 0, "35      ",4,3,53, 0, "dd 35 No",5,4,11, 16,"0b +    ",2,3,4,  8, "04 +    ",3,3,52, 0, "34      ",4,3,52, 0, "dd 34 No",5,4,3,  16,"03 +    ",5,4,193,16,"c1 +    ",5,4,197,16,"c5 +    ",1,5,195,0, "c3 N N  ", 1,6,10 ,0, "10      ",1,6,24 ,0, "18      ",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   ""
 75 DATA 1,2,206,0,"ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + KW ",5,7,009,16,"dd 09 + ",5,7,009,16,"fd 09 + ",9,5,204,16,"cc N N  ",9,6,0,16,  "jr No   "
 
 80 REM 8 bit reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
@@ -87,24 +76,26 @@
 84 DIM s(8): FOR k=1 TO 8: READ s(k): NEXT k
 85 DATA 3,0,0,1,0,0,0,2
 
+88 DEF FN h(x)=INT(x/256):      REM high byte
+89 DEF FN l(y)=y-(FN h(y)*256): REM low byte
+
 90 REM --- step 1: read op code data, parse into struct --------------------------------------
 
-91 LET byteCount=0: LET lc=1: LET lt=1: REM byte count, line count, label total
 92 LET codeLoc=(PEEK 23635+(256*PEEK 23636))+5: REM get start location of REM lines
 
 93 REM define GOTO/GOSUB line constants
 94 LET gState0=100: LET gState1=110: LET gState2=120: LET gState3=130: LET gState4=140: LET gState5=150: LET gFinish=9999
-95 LET sGetToken=500: LET sGetDelim=520: LET sLookupOpCode=200
+95 LET sGetToken=500: LET sGetDelim=520: LET sSetLabel=550: LET sGetLabel=560: LET sSetPending=570: LET sGetPending=580: LET sCalcImdLabel=600: LET sCalcRelLabel=610: LET sLookupOpCode=200
 
 96 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350
-97 LET sGetRule=550: LET sGetArgType=530: LET sRuleBase=1000
+97 LET sGetRule=540: LET sGetArgType=530: LET sRuleBase=1000
 98 LET sPrintResult=8000: LET sPrintError=8050
 
 100 LET state=0: LET ch=PEEK codeLoc
 102 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState1
 104 IF  ch=13 THEN LET codeLoc=codeLoc+6: GOTO gState0
 106 IF  ch=36 THEN GOTO gState4: REM $end$
-108 GOSUB sGetToken: LET l$(lt)=t$: LET l(lt)=LEN(t$): LET p(lt)=byteCount: LET lt=lt+1: GOTO gState1
+108 GOSUB sGetToken: LET z$=t$: GOSUB sSetLabel: GOTO gState1
 
 110 LET state=1: LET ch=PEEK codeLoc
 112 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState1
@@ -200,7 +191,7 @@
 529 REM arg types 1:N | 2:r | 3:(hl) | 4:(ir+No) | 5:rr
 
 530 REM sGetArgType(in:z$, out:argType) sets argType based on z$
-531 IF z$(1)="@" THEN LET argType=1: RETURN: REM one byte num 
+531 IF z$(1)="@" or z$(1)="!" THEN LET argType=1: RETURN: REM number or label (1 or 2 bytes)
 532 LET length=LEN z$
 533 IF  length=1 THEN LET argType=2: RETURN: REM b,c,d,e,h,l,a
 534 IF  length=2 THEN LET argType=5: RETURN: REM bc,de,hl,ix,iy
@@ -208,13 +199,58 @@
 536 LET argType=4: REM (ix+No),(iy+No)
 537 RETURN
 
-550 REM sGetRule(in:key, in:ruleCount, in:z$) set key to index of rule to apply
-552 IF  b(key)=9 THEN RETURN: REM match any arg type: only one rule used
-554 LET argType=0: GOSUB sGetArgType
-556 FOR k=0 TO ruleCount-1: IF NOT b(key+k)=argType THEN NEXT k
-558 IF  k=ruleCount THEN LET w$="error: arg type not found": GOSUB sPrintError: STOP
-560 LET key=key+k
-562 RETURN
+540 REM sGetRule(in:key, in:ruleCount, in:z$) set key to index of rule to apply
+541 IF  b(key)=9 THEN RETURN: REM match any arg type: only one rule used
+542 LET argType=0: GOSUB sGetArgType
+543 FOR k=0 TO ruleCount-1: IF NOT b(key+k)=argType THEN NEXT k
+544 IF  k=ruleCount THEN LET w$="error: arg type not found": GOSUB sPrintError: STOP
+545 LET key=key+k
+546 RETURN
+
+550 REM sSetLabel(in:z$) adds label to label table
+552 GOSUB sGetLabel: IF li<>0 THEN LET w$="error: label already defined": GOSUB sPrintError: STOP
+554 LET l$(lt)=z$: LET l(lt)=LEN(z$)
+556 LET p(lt)=byteCount: LET lt=lt+1
+558 RETURN
+
+560 REM sGetLabel(in:z$, out:li) find label, return li (index in label table, or 0)
+561 LET li=0
+562 FOR z=1 TO lt-1
+563    IF z$=l$(z,TO l(z)) THEN LET li=z: RETURN
+564 NEXT z
+565 RETURN
+
+570 REM sSetPending(in:z$, in:lpa) adds label to label pending table
+572 LET v$(lpt)=z$: LET v(lpt)=LEN(z$)
+574 LET q(lpt)=byteCount: LET h(lpt)=lpa: LET lpt=lpt+1
+576 RETURN
+
+580 REM sGetPending(in:z$) find label, return li (index in label table, or 0)
+581 LET lpi=0: LET lpa=0
+582 FOR z=1 TO lpt-1
+583    IF z$=v$(z,TO v(z)) THEN LET lpi=z: LET lpa=h(z): RETURN
+584 NEXT z
+585 RETURN
+
+600 REM sCalcImdLabel(in:z$, in:orgAddress, out:num)
+601 GOSUB sGetLabel
+602 IF  li=0 THEN LET num=0: LET lpa=2: GOSUB sSetPending: RETURN
+603 LET num=p(li)+orgAddress
+609 RETURN
+
+610 REM sCalcRelLabel(in:z$, out:num)
+611 GOSUB sGetLabel
+612 IF  li=0 THEN LET num=0: LET lpa=1: GOSUB sSetPending: RETURN
+613 LET num=p(li)-(byteCount+2): REM must +2 for <op> No
+619 RETURN
+
+620 REM sCalcImdJump(in:num, out:numl, out:numh) splits num into low,high
+624 REM is this needed???? LET numl=FN l(num): LET numh=FN h(num)
+629 RETURN
+
+630 REM sCalcRelJump(in:num, out:num) calc val (-126 to +129) for num, writes num to num
+631 REM is this needed???? IF num<0 THEN LET num=256+num
+639 RETURN
 
 989 REM --- rule definitions -----------------------------------------------------------------
 
@@ -223,31 +259,32 @@
 992 REM - rule 2: <op> N         | size=2 
 993 REM - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
 994 REM - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
-995 REM - rule 5: <op> N N       | size=3
-995 REM - rule 6: <op:jr> No     | size=2 | relative jump +/-127 bytes
+995 REM - rule 5: <op> N N       | size=3 | low,high byte order, immediate extended address
+995 REM - rule 6: <op:jr,djnz> No| size=2 | relative jump -126 to +129 (1 byte signed)
 
 1000 REM sRuleBase:0 <op> | size=1 | no prefix
-1002 LET w$=STR$(d(key)): LET bytes=1
+1002 LET mi=byteCount+1: LET w(mi)=d(key): LET bytes=1
+1004 LET w$=STR$(d(key))
 1097 GOSUB sPrintResult
 1098 LET byteCount=byteCount+bytes
 1099 RETURN
 
 1100 REM sRuleBase:1 ed(237) <op> | size=2 | prefix
-1102 IF z$="" THEN LET w$="237 "+STR$(d(key)): LET bytes=2
+1102 LET mi=byteCount+1: LET w(mi)=237: LET w(mi+1)=d(key): LET bytes=2
+1104 LET w$="237 "+STR$(d(key))
 1197 GOSUB sPrintResult
 1198 LET byteCount=byteCount+bytes
 1199 RETURN
 
 1200 REM sRuleBase:2 <op> N | 2 bytes
-1204 LET t$=z$
-1206 LET d$=",": GOSUB sGetDelim
-1210 LET t$=z$(index+2 TO)
-1220 LET w$=STR$(d(key))+" "+t$: LET bytes=2
+1202 LET z$=z$(2 TO)
+1204 LET mi=byteCount+1: LET w(mi)=d(key): LET w(mi+1)=val(z$): LET bytes=2
+1206 LET w$=STR$(d(key))+" "+z$
 1297 GOSUB sPrintResult
 1298 LET byteCount=byteCount+bytes
 1299 RETURN
 
-1300 REM sRuleBase:3 <op> r,(rr) | 1 byte | (ir+No) | 2 bytes
+1300 REM ===> UPDATE <=== sRuleBase:3 <op> r,(rr) | 1 byte | (ir+No) | 2 bytes
 1302 LET offset=0: LET bytes=1: LET w$="": LET t$=""
 1304 LET lval=(CODE z$(1) - CODE("a")) + 1
 1306 IF  lval>0 THEN LET offset=r(lval)*e(key): GOTO 1340: REM a-l
@@ -285,32 +322,36 @@
 1498 LET byteCount=byteCount+bytes
 1499 RETURN
 
-1500 REM sRuleBase:5 <op> N N | size=3 -> high, low byte order?
-1501 LET w$="r5": LET bytes=1: REM use key for lookup
-1505 REM IF <256 THEN write 1 byte, else write h,l bytes
+1500 REM sRuleBase:5 <op:jp,call> N N | size=3 | order: low,high byte
+1502 LET lpa=2: REM lpa:2=2 bytes, immediate jump
+1504 LET t$=z$(1): LET z$=z$(2 TO)
+1506 IF  t$<>"!" THEN LET num=val(z$): GOTO 1510
+1508 GOSUB sCalcImdLabel
+
+1510 LET mi=byteCount+1: LET w(mi)=d(key): LET w(mi+1)=FN l(num): LET w(mi+2)=FN h(num)
+1512 LET w$=STR$(d(key))+" "+STR$(w(mi+1))+" "+STR$(w(mi+2))
+1514 LET bytes=3
+
 1597 GOSUB sPrintResult
 1598 LET byteCount=byteCount+bytes
 1599 RETURN
 
-1600 REM sRuleBase:6 <op:jr> No | size=2 -> calc +/-bytes to jump
-1602 LET bytes=2: LET w$=""
+1600 REM sRuleBase:6 <op:jr,djnz> No| size=2 | relative jump -126 to +129 (1 byte signed)
+1602 LET mcode=0: LET lpa=1: REM lpa:1=1 byte, relative jump
+1604 IF o(i)=0 THEN LET mcode=d(key): GOTO 1610: REM one arg
+1605 IF n$(i,TO n(i))="nz" THEN LET mcode=32: GOTO 1610: REM two args
+1606 IF n$(i,TO n(i))="z"  THEN LET mcode=40: GOTO 1610
+1607 IF n$(i,TO n(i))="nc" THEN LET mcode=48: GOTO 1610
+1608 IF n$(i,TO n(i))="c"  THEN LET mcode=56: GOTO 1610
 
-1604 REM All relative jumps are calculated by rule 6 (z$=No)
-1605 REM - Add parse lookups for 1 and 2 arg op codes
-1606 REM     "djnz",56,     |56| 1,6,10,0,"10" -> 1 arg
-1607 REM     "jr  ",57,     |57| 1,6,24,0,"18" -> 1 arg
-1608 REM     "jr  ","*",78, |77| 9,6,0,16,""   -> 2 args
-1609 REM - Check arg count before determining machine code
+1610 LET t$=z$(1): LET z$=z$(2 TO)
+1612 IF  t$<>"!" THEN LET num=val(z$): GOTO 1620
+1614 GOSUB sCalcRelLabel
 
-1610 IF o(i)=0 THEN LET mcode=d(key): GOTO 1642: REM one arg
-1612 IF n$(i,TO n(i))="nz" THEN LET mcode=32: GOTO 1642: REM two args
-1614 IF n$(i,TO n(i))="z"  THEN LET mcode=40: GOTO 1642
-1616 IF n$(i,TO n(i))="nc" THEN LET mcode=48: GOTO 1642
-1618 IF n$(i,TO n(i))="c"  THEN LET mcode=56: GOTO 1642
-
-1620 REM ==> if z$ is a label then calculate label jump (+/-127) <==
-
-1642 LET w$=w$+STR$(mcode)+z$
+1620 IF num<0 THEN LET num=256+num
+1622 LET mi=byteCount+1: LET w(mi)=mcode: LET w(mi+1)=num
+1624 LET w$=STR$(mcode)+" "+STR$(w(mi+1))
+1626 LET bytes=2
 
 1697 GOSUB sPrintResult
 1698 LET byteCount=byteCount+bytes
