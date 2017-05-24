@@ -287,7 +287,8 @@
 1298 LET byteCount=byteCount+bytes
 1299 RETURN
 
-1300 REM ===> UPDATE <=== sRuleBase:3 <op> r,(rr) | 1 byte | (ir+No) | 2 bytes
+1300 REM sRuleBase:3 <op> r,(rr) | 1 byte | (ir+No) | 3 bytes
+1301 LET mi=byteCount+1
 1302 LET offset=0: LET bytes=1: LET w$="": LET t$=""
 1304 LET lval=(CODE z$(1) - CODE("a")) + 1
 1306 IF  lval>0 THEN LET offset=r(lval)*e(key): GOTO 1340: REM a-l
@@ -298,28 +299,35 @@
 1315 LET t$=z$
 1316 LET d$="@": GOSUB sGetDelim: LET idx1=index+1
 1318 LET d$=")": GOSUB sGetDelim: LET idx2=index-1
-1320 LET t$=z$(idx1 TO idx2)
-1322 IF  z$(3)="x" THEN LET w$="dd "
-1324 IF  z$(3)="y" THEN LET w$="fd "
+1320 LET t$=z$(idx1 TO idx2): LET mcode=d(key)+offset
+1322 IF  z$(3)="x" THEN LET w(mi)=221: LET w(mi+1)=mcode: LET w$="221 "+STR$(mcode)
+1324 IF  z$(3)="y" THEN LET w(mi)=253: LET w(mi+1)=mcode: LET w$="253 "+STR$(mcode)
+1326 LET num=VAL(t$): LET mi=mi+1: GOSUB sWriteRel
+1328 GOTO 1397
 
 1340 LET mcode=d(key)+offset
-1342 LET w$=w$+STR$(mcode)+" "+t$
+1342 LET w(mi)=mcode: LET bytes=1
+1344 LET w$=STR$(mcode)
 
 1397 GOSUB sPrintResult
 1398 LET byteCount=byteCount+bytes
 1399 RETURN
 
 1400 REM sRuleBase:4 <op> rr + | size=1 | +offset | <op> ir | size=2
+1401 LET mi=byteCount+1
 1402 LET offset=0: LET bytes=1: LET w$=""
 1404 LET lval=(CODE z$(1) - CODE("a")) + 1
 1406 IF  lval<9 THEN LET offset=r(lval)*e(key): GOTO 1440: REM af,bc,de,hl
 1408 IF  lval>9 THEN LET offset=3*e(key): GOTO 1440: REM sp
-1410 LET offset=2*e(key): LET bytes=2: REM ix,iy
-1412 IF  z$="ix" THEN LET w$="dd "
-1414 IF  z$="iy" THEN LET w$="fd "
+
+1410 LET offset=2*e(key): LET mcode=d(key)+offset: LET bytes=2: REM ix,iy
+1412 IF  z$="ix" THEN LET w(mi)=221: LET w(mi+1)=mcode: LET w$="221 "+STR$(mcode)
+1414 IF  z$="iy" THEN LET w(mi)=253: LET w(mi+1)=mcode: LET w$="253 "+STR$(mcode)
+1416 GOTO 1497
 
 1440 LET mcode=d(key)+offset
-1442 LET w$=w$+STR$(mcode)
+1442 LET w(mi)=mcode: LET bytes=1
+1444 LET w$=w$+STR$(mcode)
 
 1497 GOSUB sPrintResult
 1498 LET byteCount=byteCount+bytes
