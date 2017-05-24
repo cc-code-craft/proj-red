@@ -1,21 +1,12 @@
-1 REM       ini
-2 REM loop  ldd
-3 REM       nop
-4 REM lp1   dec d
-5 REM       jr @5
-6 REM       djnz !lp3
-8 REM       and (ix+@125)
-9 REM       and (hl)
-10 REM      add a,b
-11 REM       add a,a
-12 REM lp2   jr nz,!loop
-13 REM       add a,ix
-14 REM       jp !lp1
-15 REM       add a,(iy+@35)
-16 REM lp3   add a,@14
-17 REM       push ix
-18 REM       dec de
-19 REM       $end$
+1 REM       nop
+2 REM loop  jr !lp1
+3 REM       call @65278
+4 REM lp1   jp !lp2
+5 REM       call @65278
+6 REM lp2   nop
+7 REM       jr !loop
+8 REM       jp !loop
+9 REM       $end$
 
 30 REM Assumptions on code format
 31 REM  - [label] [opcode] [operand] [comment]
@@ -32,7 +23,7 @@
 39 REM label, length, byte position, label total, label index
 40 DIM l$(maxLabels,5): DIM l(maxLabels): DIM p(maxLabels): LET lt=1: LET li=0
 41 DIM v$(maxLabels,5): DIM v(maxLabels): DIM q(maxLabels): DIM h(maxLabels): LET lpt=1: LET lpi=0: LET lpa=0: REM label pending table
-42 REM label name, byte position, arg type 1: 1 byte rel signed (No +129 to –126), 2 bytes abs from orgAddress (N N), lp total, lp index
+42 REM label name, length, byte position, arg type 1: 1 byte rel signed (No +129 to –126), 2 bytes abs from orgAddress (N N), lp total, lp index
 
 43 REM opcode, length, line count
 44 DIM m$(maxLines,5): DIM m(maxLines): LET lc=1
@@ -85,7 +76,7 @@
 
 93 REM define GOTO/GOSUB line constants
 94 LET gState0=100: LET gState1=110: LET gState2=120: LET gState3=130: LET gState4=140: LET gState5=150: LET gFinish=9999
-95 LET sGetToken=500: LET sGetDelim=520: LET sSetLabel=550: LET sGetLabel=560: LET sSetPending=570: LET sGetPending=580: LET sCalcImdLabel=600: LET sCalcRelLabel=610: LET sLookupOpCode=200
+95 LET sGetToken=500: LET sGetDelim=520: LET sSetLabel=550: LET sGetLabel=560: LET sSetPending=570: LET sGetPending=580: LET sCalcImdLabel=600: LET sCalcRelLabel=610: LET sWriteImd=620: LET sWriteRel=630: LET sLookupOpCode=200
 
 96 LET gOpState0=250: LET gOpNext=240: LET gOpState1=300: LET gOpState2=350
 97 LET sGetRule=540: LET sGetArgType=530: LET sRuleBase=1000
@@ -121,8 +112,13 @@
 142 GOSUB sLookupOpCode
 149 LET lc=lc+1: GOTO gState0
 
-150 LET state=5: REM pass2: resolve label jumps
-152 REM GOSUB sCalcLabelJumps
+150 LET state=5: REM pass2: resolve pending label jumps
+152 FOR i=1 TO lpt-1
+154    LET z$=v$(i,TO v(i))
+156    LET byteCount=q(i): LET mi=byteCount+1: LET w$=""
+158    IF h(i)=1 THEN GOSUB sCalcRelLabel: GOSUB sWriteRel: PRINT w$
+160    IF h(i)=2 THEN GOSUB sCalcImdLabel: GOSUB sWriteImd: PRINT w$
+180 NEXT i
 
 199 GOTO gFinish
 
@@ -244,12 +240,17 @@
 613 LET num=p(li)-(byteCount+2): REM must +2 for <op> No
 619 RETURN
 
-620 REM sCalcImdJump(in:num, out:numl, out:numh) splits num into low,high
-624 REM is this needed???? LET numl=FN l(num): LET numh=FN h(num)
+620 REM sWriteImd(in:w, in:mi in:num, in+out:w$) splits num into low,high, writes to machine code
+621 LET w$="I"+STR$(w(mi))+"|"+STR$(w(mi+1))+"|"+STR$(w(mi+2))+"->"
+622 LET w(mi+1)=FN l(num): LET w(mi+2)=FN h(num)
+624 LET w$=w$+STR$(w(mi+1))+"|"+STR$(w(mi+2))
 629 RETURN
 
-630 REM sCalcRelJump(in:num, out:num) calc val (-126 to +129) for num, writes num to num
-631 REM is this needed???? IF num<0 THEN LET num=256+num
+630 REM sWriteRel(in:w, in:mi, in:num, in+out:w$) calc val (-126 to +129) for num, writes to machine code
+632 IF num<0 THEN LET num=256+num
+633 LET w$="R"+STR$(w(mi))+"|"+STR$(w(mi+1))+"->"
+634 LET w(mi+1)=num
+636 LET w$=w$+STR$(w(mi+1))
 639 RETURN
 
 989 REM --- rule definitions -----------------------------------------------------------------
@@ -328,9 +329,10 @@
 1506 IF  t$<>"!" THEN LET num=val(z$): GOTO 1510
 1508 GOSUB sCalcImdLabel
 
-1510 LET mi=byteCount+1: LET w(mi)=d(key): LET w(mi+1)=FN l(num): LET w(mi+2)=FN h(num)
-1512 LET w$=STR$(d(key))+" "+STR$(w(mi+1))+" "+STR$(w(mi+2))
-1514 LET bytes=3
+1510 LET mi=byteCount+1
+1512 LET w(mi)=d(key): LET w$=STR$(d(key))
+1514 GOSUB sWriteImd
+1516 LET bytes=3
 
 1597 GOSUB sPrintResult
 1598 LET byteCount=byteCount+bytes
@@ -348,10 +350,10 @@
 1612 IF  t$<>"!" THEN LET num=val(z$): GOTO 1620
 1614 GOSUB sCalcRelLabel
 
-1620 IF num<0 THEN LET num=256+num
-1622 LET mi=byteCount+1: LET w(mi)=mcode: LET w(mi+1)=num
-1624 LET w$=STR$(mcode)+" "+STR$(w(mi+1))
-1626 LET bytes=2
+1622 LET mi=byteCount+1
+1624 LET w(mi)=mcode: LET w$=STR$(mcode)
+1626 GOSUB sWriteRel
+1628 LET bytes=2
 
 1697 GOSUB sPrintResult
 1698 LET byteCount=byteCount+bytes

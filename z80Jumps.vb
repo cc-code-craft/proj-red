@@ -12,9 +12,9 @@
 ' - uses only two bytes
 ' - allows for relocatable code
 ' - the second byte is a signed two’s complement displacement
-' - displacement can be in the range of +129 to –126
+' - displacement can be in the range of +129 to -126
 ' => is measured from the address of the instruction op code
-'    (displacement can range between +127 and –128 from A+2)
+'    (displacement can range between +127 and -128 from A+2)
 
 ' Example Usage of Relative Jump with DJNZ Instruction
 ' 
@@ -70,3 +70,13 @@
 1607 REM     "jr  ",57,     |57| 1,6,24,0,"18" -> 1 arg
 1608 REM     "jr  ","*",78, |77| 9,6,0,16,""   -> 2 args
 1609 REM - Check arg count before determining machine code
+----------------------------------------------------------------------
+'                                        pass1             pass2
+'      nop         00  00        01                 | 
+'loop  jr !lp1     01  24 00     02                 | 
+'lp1   nop         03  00        01                 | 
+'      jp !lp2     04  HH 00 00  03                 | 
+'lp2   nop         07  00        01                 | 
+'      jr !loop    08  24 00     03  os=loop-(cur+2)| 
+'      jp !loop    10  HH 00 00  03  os=org+loop    | 
+'      $end$
