@@ -8,33 +8,24 @@
 8 REM       jp !loop
 9 REM       $end$
 
-29 PRINT "-- pass1 -----------------------"
+36 REM ---- Lines 1-35 reserved for assembler code: ee instructions ---------------------------
 
-30 REM Assumptions on code format
-31 REM  - [label] [opcode] [operand] [comment]
-32 REM  - fields are seperated by at least one space
-33 REM  - if no label then opcode must be preceeded by a space
-34 REM  - the operand must not contain spaces; labels defined only once
-35 REM  - numbers are decimal, prefixed by '@', labels (as args) prefixed by "!"
+37 CLEAR 57174: LET orgAddress=57175
 
-36 REM temp vars: (free g,h$,s$)              i,j,k,                            t$,         w$,x$,x,y$,y,z,z$
-37 REM DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,   u,u$,_,_,
-
-38 LET maxLabels=5: LET maxLines=20: LET maxCodeBytes=1024: LET byteCount=0: LET orgAddress=32767
+38 LET maxLabels=5: LET maxLines=20: LET maxCodeBytes=1024: LET byteCount=0
 
 39 REM label, length, byte position, label total, label index
 40 DIM l$(maxLabels,5): DIM l(maxLabels): DIM p(maxLabels): LET lt=1: LET li=0
 41 DIM v$(maxLabels,5): DIM v(maxLabels): DIM q(maxLabels): DIM h(maxLabels): LET lpt=1: LET lpi=0: LET lpa=0: REM label pending table
 42 REM label name, length, byte position, arg type 1: 1 byte rel signed (No +129 to –126), 2 bytes abs from orgAddress (N N), lp total, lp index
 
-43 REM opcode, length, line count
-44 DIM m$(maxLines,5): DIM m(maxLines): LET lc=1
+43 REM opcode, arg1, arg2, line count
+44 LET m$="": LET n$="": LET o$="": LET lc=1
 
-45 REM operand arg1, length, arg2, length
-46 DIM n$(maxLines,10): DIM n(maxLines): DIM o$(maxLines,10): DIM o(maxLines)
+45 REM machine code, index
+46 DIM w(maxCodeBytes): LET mi=byteCount+1
 
-47 REM machine code, index
-48 DIM w(maxCodeBytes): LET mi=byteCount+1
+48 PRINT "-- pass1 -----------------------"
 
 49 REM --- create op code look up tables -----------------------------------------------------
 50 REM Define lookup level based on opcode and args: 0=no args, 1=one arg, 2=two args
@@ -84,7 +75,7 @@
 97 LET sGetRule=540: LET sGetArgType=530: LET sRuleBase=1000
 98 LET sPrintResult=8000: LET sPrintError=8050
 
-100 LET state=0: LET ch=PEEK codeLoc
+100 LET state=0: LET m$="": LET n$="": LET o$="": LET ch=PEEK codeLoc
 102 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState1
 104 IF  ch=13 THEN LET codeLoc=codeLoc+6: GOTO gState0
 106 IF  ch=36 THEN GOTO gState4: REM $end$
@@ -94,7 +85,7 @@
 112 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState1
 114 IF  ch=13 THEN PRINT "error: no opcode after label": STOP
 116 IF  ch=36 THEN GOTO gState5: REM $end$
-118 GOSUB sGetToken: LET m$(lc)=t$: LET m(lc)=LEN(t$): GOTO gState2
+118 GOSUB sGetToken: LET m$=t$: GOTO gState2
 
 120 LET state=2: LET ch=PEEK codeLoc
 122 IF  ch=32 THEN LET codeLoc=codeLoc+1: GOTO gState2
@@ -102,9 +93,9 @@
 124 IF  ch=36 THEN PRINT "error: unexpected $end$ after opcode": STOP
 125 IF  ch=59 THEN LET codeLoc=codeLoc+1: GOTO gState3
 126 GOSUB sGetToken: LET index=0: LET d$=",": GOSUB sGetDelim
-127 IF NOT index THEN LET n$(lc)=t$: LET n(lc)=LEN(t$): GOTO gState3
-128 LET n$(lc)=t$(TO index-1): LET n(lc)=LEN(t$(TO index-1))
-129 LET o$(lc)=t$(index+1 TO): LET o(lc)=LEN(t$(index+1 TO)): GOTO gState3
+127 IF NOT index THEN LET n$=t$: GOTO gState3
+128 LET n$=t$(TO index-1)
+129 LET o$=t$(index+1 TO): GOTO gState3
 
 130 LET state=3: LET ch=PEEK codeLoc
 132 IF  ch=13 THEN LET codeLoc=codeLoc+6: GOTO gState4
@@ -119,26 +110,33 @@
 
 152 FOR i=1 TO lpt-1
 154    LET z$=v$(i,TO v(i))
-156    LET byteCount=q(i): LET mi=byteCount+1: LET w$=""
+156    LET byteLoc=q(i): LET mi=byteLoc+1: LET w$=""
 158    IF h(i)=1 THEN GOSUB sCalcRelLabel: GOSUB sWriteRel: PRINT w$
 160    IF h(i)=2 THEN GOSUB sCalcImdLabel: GOSUB sWriteImd: PRINT w$
-180 NEXT i
+162 NEXT i
+
+164 PRINT "--------------------------------"
+165 PRINT "byte total="+STR$(byteCount-1)+" line total="+STR$(lc-1)
+
+168 LET memLoc=orgAddress
+170 FOR i=1 to byteCount+1
+172    POKE memLoc,w(i): LET memLoc=memLoc+1
+174 NEXT i
 
 199 GOTO gFinish
 
 200 REM --- step 2: look up op code data, generate machine code ------------------------------
 
-234 REM sLookupOpCode(in:lc, in:m$(), in:m(), in:n$(), in:n(), in:o$(), in:o()) updates v()
-235 LET i=lc
-236 IF n(i)=0 THEN GOTO gOpState0: REM no args
-237 IF o(i)=0 THEN GOTO gOpState1: REM one arg
+234 REM sLookupOpCode(in:lc, in:m$ in:n$, in:o$) updates v()
+236 IF n$="" THEN GOTO gOpState0: REM no args
+237 IF o$="" THEN GOTO gOpState1: REM one arg
 238 GOTO gOpState2: REM two args
 
 240 REM gOpNext
 245 RETURN
 
 250 REM --- gOpState0, no args ---------------------
-251 FOR j=1 TO tot0: IF NOT (m$(i,TO m(i))=u$(j,TO m(i))) THEN NEXT j: REM slower? FN c(m$(i,TO m(i)),u$(j))
+251 FOR j=1 TO tot0: IF NOT (m$=u$(j,TO LEN(m$))) THEN NEXT j
 252 IF j=tot0+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
 254 LET z$="": LET argType=0: LET key=j
 
@@ -146,22 +144,22 @@
 299 GOTO gOpNext
 
 300 REM --- gOpState1, one arg ---------------------
-301 FOR j=1 TO tot1: IF NOT (m$(i,TO m(i))=a$(j,TO m(i))) THEN NEXT j
+301 FOR j=1 TO tot1: IF NOT (m$=a$(j,TO LEN(m$))) THEN NEXT j
 302 IF j=tot1+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
 
-303 LET key=a(j): LET ruleCount=a(j+1)-a(j): LET z$=n$(i,TO n(i))
+303 LET key=a(j): LET ruleCount=a(j+1)-a(j): LET z$=n$
 304 GOSUB sGetRule: REM get rule to process arg1
 
 320 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
 322 GOTO gOpNext
 
 350 REM --- gOpState2, two args ---------------------
-351 FOR j=1 TO tot2: IF NOT (m$(i,TO m(i))=f$(j,TO m(i))) THEN NEXT j
+351 FOR j=1 TO tot2: IF NOT (m$=f$(j,TO LEN(m$))) THEN NEXT j
 352 IF  g$(j,1)="*" THEN GOTO 356: REM match wildcard *
-353 FOR j=j TO tot2: IF NOT (n$(i,TO n(i))=g$(j,TO n(i))) THEN NEXT j: REM match arg 1
+353 FOR j=j TO tot2: IF NOT (n$=g$(j,TO LEN(n$))) THEN NEXT j: REM match arg 1
 354 IF  j=tot2+1 THEN LET w$="error: opcode not found": GOSUB sPrintError: STOP
 
-356 LET key=f(j): LET ruleCount=f(j+1)-f(j): LET z$=o$(i,TO o(i))
+356 LET key=f(j): LET ruleCount=f(j+1)-f(j): LET z$=o$
 358 GOSUB sGetRule: REM get rule to process arg2
 
 398 GOSUB sRuleBase+(c(key)*100): REM z$=arg, apply rule
@@ -238,10 +236,10 @@
 603 LET num=p(li)+orgAddress
 609 RETURN
 
-610 REM sCalcRelLabel(in:z$, out:num)
+610 REM sCalcRelLabel(in:z$, in:byteLoc, out:num)
 611 GOSUB sGetLabel
 612 IF  li=0 THEN LET num=0: LET lpa=1: GOSUB sSetPending: RETURN
-613 LET num=p(li)-(byteCount+2): REM must +2 for <op> No
+613 LET num=p(li)-(byteLoc+2): REM must +2 for <op> No
 619 RETURN
 
 620 REM sWriteImd(in:w, in:mi in:num, in+out:w$) splits num into low,high, writes to machine code
@@ -350,15 +348,15 @@
 
 1600 REM sRuleBase:6 <op:jr,djnz> No| size=2 | relative jump -126 to +129 (1 byte signed)
 1602 LET mcode=0: LET lpa=1: REM lpa:1=1 byte, relative jump
-1604 IF o(i)=0 THEN LET mcode=d(key): GOTO 1610: REM one arg
-1605 IF n$(i,TO n(i))="nz" THEN LET mcode=32: GOTO 1610: REM two args
-1606 IF n$(i,TO n(i))="z"  THEN LET mcode=40: GOTO 1610
-1607 IF n$(i,TO n(i))="nc" THEN LET mcode=48: GOTO 1610
-1608 IF n$(i,TO n(i))="c"  THEN LET mcode=56: GOTO 1610
+1604 IF o$="" THEN LET mcode=d(key): GOTO 1610: REM one arg
+1605 IF n$="nz" THEN LET mcode=32: GOTO 1610: REM two args
+1606 IF n$="z"  THEN LET mcode=40: GOTO 1610
+1607 IF n$="nc" THEN LET mcode=48: GOTO 1610
+1608 IF n$="c"  THEN LET mcode=56: GOTO 1610
 
 1610 LET t$=z$(1): LET z$=z$(2 TO)
 1612 IF  t$<>"!" THEN LET num=val(z$): GOTO 1620
-1614 GOSUB sCalcRelLabel
+1614 LET byteLoc=byteCount: GOSUB sCalcRelLabel
 
 1622 LET mi=byteCount+1
 1624 LET w(mi)=mcode: LET w$=STR$(mcode)
@@ -378,10 +376,13 @@
 7999 REM --- message output -------------------------------------------------------------------
 
 8000 REM sPrintResult(in:i, in:w$, in:argType, in:key, in:bytes)
+8002 LET t$=m$
+8004 IF LEN(n$)>5 THEN LET t$=t$+n$(TO 5): GOTO 8008
+8006 LET t$=t$+n$
+8008 IF LEN(o$)>4 THEN LET t$=t$+o$(TO 4):GOTO 8015
+8010 LET t$=t$+o$
 8015 PRINT STR$(byteCount);
-8020 PRINT TAB  2;m$(i,TO 4);
-8022 PRINT TAB  6;n$(i,TO 5);
-8024 PRINT TAB 11;o$(i,TO 4);
+8020 PRINT TAB  2;t$;
 8030 PRINT TAB 15;STR$(argType);
 8035 PRINT TAB 17;STR$(c(key));
 8040 PRINT TAB 19;w$;
@@ -389,7 +390,7 @@
 8049 RETURN
 
 8050 REM sPrintError(in:i, in:w$)
-8052 PRINT w$+"|"+m$(i,TO m(i))+"|"+n$(i,TO n(i))+"|"+o$(i,TO o(i))
+8052 PRINT w$+"|"+m$+"|"+n$+"|"+o$
 8099 RETURN
 
 9999 PRINT "finished"

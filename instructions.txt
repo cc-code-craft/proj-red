@@ -1,0 +1,18 @@
+
+Assumptions on code format
+ - org is defined as 57175 (=> 8K available)
+ - [label] [opcode] [operand] [comment]
+ - fields are seperated by at least one space
+ - if no label then opcode must be preceeded by a space
+ - the operand must not contain spaces; labels defined only once
+ - numbers are decimal, prefixed by '@', labels (as args) prefixed by "!"
+
+temp vars: (free g,h$,s$)              i,j,k,                            t$,         w$,x$,x,y$,y,z,z$
+DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,   u,u$,_,_,
+
+=> RAMTOP
+   PRINT PEEK 23730+256*PEEK 23731 = 65,367
+
+=> Reserve 8K (no impact from new)
+   CLEAR 57174
+   => org is 57175
