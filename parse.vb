@@ -8,6 +8,8 @@
 8 REM       jp !loop
 9 REM       $end$
 
+29 PRINT "-- pass1 -----------------------"
+
 30 REM Assumptions on code format
 31 REM  - [label] [opcode] [operand] [comment]
 32 REM  - fields are seperated by at least one space
@@ -113,6 +115,8 @@
 149 LET lc=lc+1: GOTO gState0
 
 150 LET state=5: REM pass2: resolve pending label jumps
+151 PRINT "-- pass2 -----------------------"
+
 152 FOR i=1 TO lpt-1
 154    LET z$=v$(i,TO v(i))
 156    LET byteCount=q(i): LET mi=byteCount+1: LET w$=""
@@ -241,16 +245,14 @@
 619 RETURN
 
 620 REM sWriteImd(in:w, in:mi in:num, in+out:w$) splits num into low,high, writes to machine code
-621 LET w$="I"+STR$(w(mi))+"|"+STR$(w(mi+1))+"|"+STR$(w(mi+2))+"->"
 622 LET w(mi+1)=FN l(num): LET w(mi+2)=FN h(num)
-624 LET w$=w$+STR$(w(mi+1))+"|"+STR$(w(mi+2))
+624 LET w$=w$+"|"+STR$(w(mi+1))+"|"+STR$(w(mi+2))+"|"
 629 RETURN
 
 630 REM sWriteRel(in:w, in:mi, in:num, in+out:w$) calc val (-126 to +129) for num, writes to machine code
 632 IF num<0 THEN LET num=256+num
-633 LET w$="R"+STR$(w(mi))+"|"+STR$(w(mi+1))+"->"
 634 LET w(mi+1)=num
-636 LET w$=w$+STR$(w(mi+1))
+636 LET w$=w$+"|"+STR$(w(mi+1))+"|"
 639 RETURN
 
 989 REM --- rule definitions -----------------------------------------------------------------
@@ -369,13 +371,13 @@
 
 8000 REM sPrintResult(in:i, in:w$, in:argType, in:key, in:bytes)
 8015 PRINT STR$(byteCount);
-8020 PRINT TAB  2;m$(i,TO m(i));
-8022 PRINT TAB  6;n$(i,TO n(i));
-8024 PRINT TAB 11;o$(i,TO o(i));
+8020 PRINT TAB  2;m$(i,TO 4);
+8022 PRINT TAB  6;n$(i,TO 5);
+8024 PRINT TAB 11;o$(i,TO 4);
 8030 PRINT TAB 15;STR$(argType);
 8035 PRINT TAB 17;STR$(c(key));
 8040 PRINT TAB 19;w$;
-8045 PRINT TAB 30;STR$(bytes)
+8045 PRINT TAB 31;STR$(bytes)
 8049 RETURN
 
 8050 REM sPrintError(in:i, in:w$)
