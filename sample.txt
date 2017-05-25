@@ -1,0 +1,101 @@
+[From Input, Volume 2, Issue 16, p478]
+
+       org 65110         ;
+       ld a,9            ; 3E 09
+       ld i,a            ; ED 47
+       im 2              ; ED 5E
+       ret               ; C9
+
+       org 65120         ; 00 00 00
+       ld a,62           ; 3E 3E
+       ld i,a            ; ED 47
+       im 1              ; ED 56
+       ret               ; C9
+
+       org 65129         ; 00 00
+       rst 56            ; FF
+       push af           ; F5
+       ld a,(23622)      ; 3A 46 5C
+       bit 7,a           ; CB 7F
+       jr z,!go          ; 28 02
+       pop af            ; F1
+       ret               ; C9
+
+go     di                ; F3
+       push be           ; C5
+       push de           ; D5
+       push hl           ; E5
+       push ix           ; DD E5
+       ld de,20726       ; 11 F6 50
+       ld (!posn),de     ; ED 53 FE FE
+       ld hl,(23621)     ; 2A 45 5C
+       call !lineno      ; CD B5 FE
+       ld de,20731       ; 11 FB 50
+       ld (!posn),de     ; ED 53 FE FE
+
+       ld hl,(23623)     ; 2A 47 5C
+       ld h,0            ; 26 00
+       call !statno      ; CD BB FE
+       ld hl,23286       ; 21 F6 5A
+       ld (hl),71        ; 36 47
+       ld de,23287       ; 11 F7 5A
+       ld bc,9           ; 01 09 00
+       ldir              ; ED B0
+keylp  ld a,127          ; 3E 7F
+       in a,254          ; DB FE
+       or 224            ; F6 E0
+       cp 252            ; FE FC
+       jr z,!keylp       ; 28 F6
+       pop ix            ; DD El
+       pop hl            ; El
+       pop de            ; D1
+       pop be            ; Cl
+       pop of            ; Fl
+       ei                ; FB
+       ret               ; C9
+	   
+lineno ld bc,-1000       ; 01 18 FC
+       call !prt         ; CD CE FE
+statno ld bc,-100        ; 01 9C FF
+       call !prt         ; CD CE FE
+       ld bc,-10         ; 01 F6 FF
+       call !prt         ; CD CE FE
+       ld bc,-1          ; 01 FF FF
+       call !prt         ; CD CE FE
+       ret               ; C9
+       
+prt    xor a             ; AF
+prtlp  add hl,bc         ; 09
+       inc a             ; 3C
+       jr c,!prtlp       ; 38 FC
+       sbc hl,bc         ; ED 42
+       dec a             ; 3D
+       add a,48          ; C6 30
+       push hl           ; E5
+       call !print       ; CD E8 FE
+       ld hl,!posn       ; 21 FE FE
+       inc (hl)          ; 34
+       ld hl,(!posn)     ; 2A FE FE
+       call !prtout      ; CD F5 FE
+       pop hl            ; E1
+       ret               ; C9
+
+print  ld bc,(23606)     ; ED 4B 36 5C
+       ld h,0            ; 26 00
+       ld i,a            ; 6F
+       add hl,hl         ; 29
+       add hl,hl         ; 29
+       add hl,hl         ; 29
+       add hl,bc         ; 09
+       ex de,hl          ; EB
+       ret               ; C9
+
+prtout ld b,8            ; 06 08
+loop   ld a,(de)         ; 1A
+       ld (hl),a         ; 77
+       inc h             ; 24
+       inc de            ; 13
+       djnz !loop        ; 10 FA
+       ret               ; C9
+
+posn   defw 0            ; 00 00

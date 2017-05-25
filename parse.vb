@@ -1,12 +1,16 @@
-1 REM       nop
-2 REM loop  jr !lp1
-3 REM       call @65278
-4 REM lp1   jp !lp2
-5 REM       call @65278
-6 REM lp2   nop
-7 REM       jr !loop
-8 REM       jp !loop
+1 REM       ld hl,@16384
+2 REM       ld b,@5
+3 REM loop  ld (hl),@255
+4 REM       inc hl
+5 REM       ld (hl),@255
+6 REM       inc hl
+7 REM       djnz !loop
+8 REM       ret
 9 REM       $end$
+
+30 REM screen memory starts at 16384 | range 16384 to 16415 => top line | 16418 => start of next line, offset 8
+32 REM FOR i=16384 TO 16384+((32*8)*8)-1: POKE i,255: NEXT i: REM prints lines first third of screen 
+35 REM PRINT ".": LET prinL=PEEK 23684: LET prinH=PEEK 23685: LET prinA=(PEEK 23684+(256*PEEK 23685)): FOR i=16384 TO 16416: POKE i,255: NEXT i: REM screen addresses (top,left)
 
 36 REM ---- Lines 1-35 reserved for assembler code: ee instructions ---------------------------
 
@@ -41,16 +45,16 @@
 63 DATA "and ",36,"call",40,"cp  ",41,"dec ",45,"inc ",49,"pop ",53,"push",54,"jp  ",55,"djnz",56,"jr  ",57,"",    58,"",    59,"",    60,"",    61,"",    62,"",    63,"",    64,"----",65 
 
 65 REM total opcodes2, f$=opcode, g$=val, f=key
-66 LET tot2=8: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
+66 LET tot2=11: DIM f$(tot2,4): DIM g$(tot2,4): DIM f(tot2)
 67 FOR i=1 TO tot2: READ f$(i), g$(i), f(i): NEXT i
-68 DATA "adc ","a",  65,"adc ","hl", 69,"add ","a",  70,"add ","ix", 75,"add ","iy", 76,"call","*" , 77,"jr  ","*" , 78,"----","--", 79 
+68 DATA "adc ","a",  65,"adc ","hl", 69,"add ","a",  70,"add ","ix", 75,"add ","iy", 76,"call","*" , 77,"jr  ","*" , 78,"ld  ","b" , 79,"ld  ","hl", 81,"ld  ","(hl)",82,"----","--", 83
 
 70 REM total keys, b=type, c=rule, d=mcode, e=offset, e$=hex display
-71 LET totK1=78: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
+71 LET totK1=82: DIM b(totK1): DIM c(totK1): DIM d(totK1): DIM e(totK1): DIM e$(totK1,8)
 72 FOR i=1 TO totK1: READ b(i), c(i), d(i), e(i), e$(i): NEXT i
 73 DATA 0,0,63, 0,"3f   ",0,1,169,0,"ed a9",0,1,185,0,"ed b9",0,1,161,0,"ed a1",0,1,177,0,"ed b1",0,0,47, 0,"2f   ",0,0,39, 0,"27   ",0,0,243,0,"f3   ",0,0,251,0,"fb   ",0,0,217,0,"d9   ",0,0,118,0,"76   ",0,1,170,0,"ed aa",0,1,186,0,"ed ba",0,1,162,0,"ed a2",0,1,178,0,"ed b2",0,1,168,0,"ed a8",0,1,184,0,"ed b8",0,1,160,0,"ed a0",0,1,176,0,"ed b0",0,1,68, 0,"ed 44",0,0,0,  0,"00   ",0,1,187,0,"ed bb",0,1,179,0,"ed b3",0,1,171,0,"ed ab",0,1,163,0,"ed a3",0,0,201,0,"c9   ",0,1,77, 0,"ed 4d",0,1,69, 0,"ed 45",0,1,23, 0,"17   ",0,0,7,  0,"07   ",0,1,111,0,"ed 6f",0,0,31, 0,"1f   ",0,0,15, 0,"0f   ",0,1,103,0,"ed 67",0,0,55, 0,"37   "
-74 DATA 1,2,230,0,"e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",1,2,254,0, "fe N    ",2,3,184,1, "b8 +    ",3,3,184,0, "be      ",4,3,184,0, "dd be No",2,3,5,  8, "05 +    ", 3,3,53, 0, "35      ",4,3,53, 0, "dd 35 No",5,4,11, 16,"0b +    ",2,3,4,  8, "04 +    ",3,3,52, 0, "34      ",4,3,52, 0, "dd 34 No",5,4,3,  16,"03 +    ",5,4,193,16,"c1 +    ",5,4,197,16,"c5 +    ",1,5,195,0, "c3 N N  ", 1,6,10 ,0, "10      ",1,6,24 ,0, "18      ",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   ""
-75 DATA 1,2,206,0,"ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + KW ",5,7,009,16,"dd 09 + ",5,7,009,16,"fd 09 + ",9,5,204,16,"cc N N  ",9,6,0,16,  "jr No   "
+74 DATA 1,2,230,0,"e6 N    ",2,3,160,1, "a0 +    ",3,3,166,0, "a6      ",4,3,166,0, "dd a6 No",1,5,205,0, "cd N N  ",1,2,254,0, "fe N    ",2,3,184,1, "b8 +    ",3,3,184,0, "be      ",4,3,184,0, "dd be No",2,3,5,  8, "05 +    ", 3,3,53, 0, "35      ",4,3,53, 0, "dd 35 No",5,4,11, 16,"0b +    ",2,3,4,  8, "04 +    ",3,3,52, 0, "34      ",4,3,52, 0, "dd 34 No",5,4,3,  16,"03 +    ",5,4,193,16,"c1 +    ",5,4,197,16,"c5 +    ",1,5,195,0, "c3 N N  ", 1,6,16 ,0, "10      ",1,6,24 ,0, "18      ",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   "",0,0,0,0,   ""
+75 DATA 1,2,206,0,"ce N    ",2,3,136,1, "88 +    ",3,3,142,0, "8e      ",4,3,142,0, "dd 8e No",5,1,074,16,"ed 4a + ",1,2,198,0, "c6 N    ",2,3,128,1, "80 +    ",3,3,134,0, "86      ",4,3,134,0, "dd 86 No",5,4,999,16,"rr + KW ",5,7,009,16,"dd 09 + ",5,7,009,16,"fd 09 + ",9,5,204,16,"cc N N  ",9,6,0,16,  "jr No   ",1,2,6,1,   "ld b,N  ",2,3,64,1,  "ld b,r +",1,2,33,0,  "ld hl NN",1,2,54,0,  "ld (hl)N"
 
 80 REM 8 bit reg offsets: a=7,b=0,c=1,d=2,e=3,0,0,h=4,l=5 | (hl)=6
 81 DIM r(9): FOR k=1 TO 9: READ r(k): NEXT k
@@ -257,10 +261,10 @@
 
 990 REM - rule 0: <op>           | size=1 | no prefix
 991 REM - rule 1: ed(237) <op> + | size=2 | prefix +offset
-992 REM - rule 2: <op> N         | size=2 
+992 REM - rule 2: <op> N , N N   | size=2 | 1,2 byte| <op> N N     | size=3 (low,high)
 993 REM - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
 994 REM - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
-995 REM - rule 5: <op> N N       | size=3 | low,high byte order, immediate extended address
+995 REM - rule 5: <op:jp,call> NN| size=3 | low,high byte order, immediate extended address
 995 REM - rule 6: <op:jr,djnz> No| size=2 | relative jump -126 to +129 (1 byte signed)
 
 1000 REM sRuleBase:0 <op> | size=1 | no prefix
@@ -277,10 +281,11 @@
 1198 LET byteCount=byteCount+bytes
 1199 RETURN
 
-1200 REM sRuleBase:2 <op> N | 2 bytes
-1202 LET z$=z$(2 TO)
-1204 LET mi=byteCount+1: LET w(mi)=d(key): LET w(mi+1)=val(z$): LET bytes=2
-1206 LET w$=STR$(d(key))+" "+z$
+1200 REM sRuleBase:2 <op> N | 2 bytes | N N | 3 bytes (low,high)
+1202 LET z$=z$(2 TO): REM strip @
+1204 LET num=val(z$): LET mi=byteCount+1: LET w(mi)=d(key): LET w$=STR$(d(key))
+1206 IF  num>255 THEN GOSUB sWriteImd: LET bytes=3
+1208 IF  num<256 THEN LET w(mi+1)=num: LET w$=w$+" "+z$: LET bytes=2
 1297 GOSUB sPrintResult
 1298 LET byteCount=byteCount+bytes
 1299 RETURN
@@ -315,7 +320,7 @@
 1401 LET mi=byteCount+1
 1402 LET offset=0: LET bytes=1: LET w$=""
 1404 LET lval=(CODE z$(1) - CODE("a")) + 1
-1406 IF  lval<9 THEN LET offset=r(lval)*e(key): GOTO 1440: REM af,bc,de,hl
+1406 IF  lval<9 THEN LET offset=s(lval)*e(key): GOTO 1440: REM af,bc,de,hl
 1408 IF  lval>9 THEN LET offset=3*e(key): GOTO 1440: REM sp
 
 1410 LET offset=2*e(key): LET mcode=d(key)+offset: LET bytes=2: REM ix,iy

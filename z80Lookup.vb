@@ -24,10 +24,28 @@
 
 ----------------------------------------------------------------------
 
-' parse 0 args
 ' - rule 0: <op>           | size=1 | no prefix
 ' - rule 1: ed(237) <op> + | size=2 | prefix +offset
+' - rule 2: <op> N , N N   | size=2 | 1,2 byte| <op> N N     | size=3 (low,high)
+' - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
+' - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
+' - rule 5: <op:jp,call> NN| size=3 | low,high byte order, immediate extended address
+' - rule 6: <op:jr,djnz> No| size=2 | relative jump -126 to +129 (1 byte signed)
+' ------------------------------------------------------------------
+' - rule 9: im 0,1,2
+' - rule 10: jp (hl),(ix),(iy)
+' - rule 11: ret z,c,pe,m
+' - rule 12: ret nz,nc,po,p
+' - rule 13: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+' - rule 14: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+' - rule 15: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
+' - rule 16: rst 0h to 38h
 
+----------------------------------------------------------------------
+
+'=> arg types 1:N | 2:r | 3:(hl) | 4:(ir+No)| 5:rr
+
+  u$     u       b      c      d       e       e$
 <op$>, <key> | <type>,<rule>,<code>,<offset>,<hex$>
 "ccf ", 1, | 1| 0,0,63, 0,"3f   ",
 "cpd ", 2, | 2| 0,1,169,0,"ed a9",
@@ -91,7 +109,7 @@
 "pop ",53, |53| 5,4,193,16,"c1 +    ",
 "push",54, |54| 5,4,197,16,"c5 +    ",
 "jp  ",55, |55| 1,5,195,0, "c3 N N  ",
-"djnz",56, |56| 1,6,10 ,0, "10      ",
+"djnz",56, |56| 1,6,16 ,0, "10      ",
 "jr  ",57, |57| 1,6,24 ,0, "18      ",
 "-",   58, |58| 0,0,0,0,   "not used",
 "-",   59, |59| 0,0,0,0,   "not used",
@@ -119,72 +137,65 @@
 "add ","ix", 75, | 75| 5,7,009,16,"dd 09 + ",
 "add ","iy", 76, | 76| 5,7,009,16,"fd 09 + ",
 "call","*" , 77, | 77| 9,5,204,16,"cc N N  ",
-"jr  ","*" , 78, | 78| 9,6,0,16,  "jr No   "
-"----","--", 79  |   | =>end<=
+"jr  ","*" , 78, | 78| 9,6,0,16,  "jr No   ",
+"ld  ","b" , 79, | 79| 1,2,6,1,   "ld b,N  ",
+                 | 80| 2,3,64,1,  "ld b,r +",
+"ld  ","hl", 81, | 81| 1,2,33,0,  "ld hl NN",
+"ld  ","(hl)",82,| 82| 1,2,54,0,  "ld (hl)N"
+"----","--", 83  |   | =>end<=
 
 *=>match any, 9=>irregular: apply same rule to all arg types
 
+'       ld b,N            06 N     | 6
+'       ld hl,NN          21 N  N  |33
+'       ld (hl),N         36 N     |54
 
 ----------------------------------------------------------------------
 
-' parse 1 arg
-' - rule 0: <op>           | size=1 | no prefix
-' - rule 1: ed(237) <op> + | size=2 | prefix +offset
-' - rule 2: <op> N         | size=2 
-' - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
-' - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
-' - rule 5: <op> N N       | size=3 | low,high byte order, immediate extended address
-' - rule 6: <op:jr,djnz> No| size=2 | relative jump -126 to +129 (1 byte signed)
+'       ld hl,NN          21 N  N
+'       ld b,N            06 N
+'       ld (hl),N         36 N
+'       inc hl            23
+        --------------------------
+		
+'       inc bc            03
+'       inc de            13
+'       inc hl            23
+'       inc ix            dd 23
+'       inc iy            fd 23
+'       inc sp            33
 
-' ------------------------------------------------------------------
-' - rule 9: im 0,1,2
-' - rule 10: jp (hl),(ix),(iy)
-' - rule 11: ret z,c,pe,m
-' - rule 12: ret nz,nc,po,p
-' - rule 13: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
-' - rule 14: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
-' - rule 15: <op> cb prefix     | rl,rlc,rr,rrc,sla,sra,srl
-' - rule 16: rst 0h to 38h
+'       ld bc,NN          01 N  N
+'       ld de,NN          11 N  N
+'       ld hl,NN          21 N  N
+'       ld ix,NN          dd 21 N  N
+'       ld iy,NN          fd 21 N  N
+'       ld sp,NN          31 N  N
 
-<op$>,<key> | <type>,<rule>,<code>,<offset>,<hex$>
-"and", 1  | 1| 1,2,230,0,"e6 N    ",
-          | 2| 2,3,160,1,"a0 +    ",
-          | 3| 3,3,166,0,"a6      ",
-          | 4| 4,3,166,0,"dd a6 No",
-"call",5  | 5| 1,5,205,0,"cd N N  ",
-"dec", 6  | 6| 2,3,5,8,  "05 +    ",
-          | 7| 3,3,35,0, "35      ",
-          | 8| 4,3,35,0, "dd 35 No",
-          | 9| 5,4,11,16,"0b +    "
-"---", 10 |  | =>end<=
+'       ld b,N            06 N
+'       ld b,b            40
+'       ld b,c            41
+'       ld b,d            42
+'       ld b,e            43
+'       ld b,h            44
+'       ld b,l            45
+'       ld b,(hl)         46
+'       ld b,(ix+No)       dd 46 N
+'       ld b,(iy+No)       fd 46 N
+'       ld b,a            47
 
-----------------------------------------------------------------------
+'       ld (bc),a         02
+'       ld (de),a         12
 
-' parse 2 args
-' - rule 0: <op>           | size=1 | no prefix
-' - rule 1: ed(237) <op> + | size=2 | prefix +offset
-' - rule 2: <op> N         | size=2 
-' - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
-' - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
-' - rule 5: <op> N N       | size=3
+'       ld (hl),N         36 N
 
-<op$>,<val$>,<key> | <type>,<rule>,<code>,<offset>,<hex$>
-"adc" ,"a",  1   | 1| 1,2,206,0, "ce N    ",
-                 | 2| 2,3,136,1, "88 +    ",
-                 | 3| 3,3,142,0, "8e      ",
-                 | 4| 4,3,142,0, "dd 8e No",
-"adc" ,"hl", 5   | 5| 5,1,074,16,"ed 4a + ",
-"add" ,"a",  6   | 6| 1,2,198,0, "c6 N    ",
-                 | 7| 2,3,128,1, "80 +    ",
-                 | 8| 3,3,134,0, "86      ",
-                 | 9| 4,3,134,0, "dd 86 No",
-"add" ,"hl", 10  |10| 5,4,009,16,"09 +    ",
-"add" ,"ix", 11  |11| 5,6,009,16,"dd 09 + ",
-"add" ,"iy", 12  |12| 5,6,009,16,"fd 09 + ",
-"call ","*", 13  |13| 9,5,204,16,"cc N N  "
-"---" ,"--", 14  |  | =>end<=
-
-*=>match any, 9=>irregular
+'       ld (hl),a         77
+'       ld (hl),b         70
+'       ld (hl),c         71
+'       ld (hl),d         72
+'       ld (hl),e         73
+'       ld (hl),h         74
+'       ld (hl),l         75
 ----------------------------------------------------------------------
 
 ' -consider adding type: <op>,<type>,...
