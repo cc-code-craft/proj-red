@@ -7,8 +7,8 @@ Assumptions on code format
  - the operand must not contain spaces; labels defined only once
  - numbers are decimal, prefixed by '@', labels (as args) prefixed by "!"
 
-temp vars: (free g,h$,s$)              i,j,k,                            t$,         w$,x$,x,y$,y,z,z$
-DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,m,m$,n,n$,o,o$,p,q,r,s,   u,u$,_,_,
+temp vars: (free g,h$,m,n,o,t,w)       i,j,k,                                     s$,_,t$,           _,w$,x$,x,y$,y,z,z$
+DIM  vars: a,a$,b,c,d,e,e$,f,f$,_,g$,_,      l,l$,_,m$,_,n$,_,o$,p,p$,q,q$,r,r$,s,      u,u$,v,v$,
 
 => RAMTOP
    PRINT PEEK 23730+256*PEEK 23731 = 65,367

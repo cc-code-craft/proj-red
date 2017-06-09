@@ -26,11 +26,13 @@
 
 ' - rule 0: <op>           | size=1 | no prefix
 ' - rule 1: ed(237) <op> + | size=2 | prefix +offset
-' - rule 2: <op> N , N N   | size=2 | 1,2 byte| <op> N N     | size=3 (low,high)
+' - rule 2: <op:mode> N,N N| size=2 | mode0 N | <op:mode1> NN| size=3 (low,high)
 ' - rule 3: <op> r,(hl) +  | size=1 | +offset | <op> (ir+No) | size=3
 ' - rule 4: <op> rr +      | size=1 | +offset | <op> ir      | size=2
 ' - rule 5: <op:jp,call> NN| size=3 | low,high byte order, immediate extended address
 ' - rule 6: <op:jr,djnz> No| size=2 | relative jump -126 to +129 (1 byte signed)
+' - rule 7: <pseudo> N +   | size=0 | pseudo ops, org address, defs byte list
+' - rule 8: <op> rr,NN +   | size=3 | +offset | <op> ir,NN   | size=4
 ' ------------------------------------------------------------------
 ' - rule 9: im 0,1,2
 ' - rule 10: jp (hl),(ix),(iy)
@@ -75,7 +77,7 @@
 "ret ",26,         | 26| 0,0,201,0,  | "c9   "
 "reti",27,         | 27| 0,1,77, 0,  | "ed 4d"
 "retn",28,         | 28| 0,1,69, 0,  | "ed 45"
-"rla ",29,         | 29| 0,1,23, 0,  | "17   "
+"rla ",29,         | 29| 0,0,23, 0,  | "17   "
 "rlca",30,         | 30| 0,0,7,  0,  | "07   "
 "rld ",31,         | 31| 0,1,111,0,  | "ed 6f"
 "rra ",32,         | 32| 0,0,31, 0,  | "1f   "
@@ -111,8 +113,8 @@
 "jp  ",55,         | 55| 1,5,195,0,  | "c3 N N  "
 "djnz",56,         | 56| 1,6,16 ,0,  | "10      "
 "jr  ",57,         | 57| 1,6,24 ,0,  | "18      "
-"-",   58,         | 58| 0,0,0,0,    | "not used"
-"-",   59,         | 59| 0,0,0,0,    | "not used"
+"org", 58,         | 58| 0,9,0,0,    | "pseudo  "
+"defs",59,         | 59| 0,9,0,0,    | "pseudo  "
 "-",   60,         | 60| 0,0,0,0,    | "not used"
 "-",   61,         | 61| 0,0,0,0,    | "not used"
 "-",   62,         | 62| 0,0,0,0,    | "not used"
@@ -128,21 +130,37 @@
                    | 66| 2,3,136,1,  | "88 +    "
                    | 67| 3,3,142,0,  | "8e      "
                    | 68| 4,3,142,0,  | "dd 8e No"
-"adc ","hl",  69,  | 69| 5,1,074,16, | "ed 4a + "
+"adc ","hl",  69,  | 69| 5,1,074,16, | "unfinshed"    "ed 4a + "
 "add ","a",   70,  | 70| 1,2,198,0,  | "c6 N    "
                    | 71| 2,3,128,1,  | "80 +    "
                    | 72| 3,3,134,0,  | "86      "
                    | 73| 4,3,134,0,  | "dd 86 No"
-                   | 74| 5,4,999,16, | "rr + KW "
-"add ","ix",  75,  | 75| 5,7,009,16, | "dd 09 + "
-"add ","iy",  76,  | 76| 5,7,009,16, | "fd 09 + "
+"add","hl",   74,  | 74| 5,4,9,16,   | "rr +    "
+"add ","ix",  75,  | 75| 5,9,999,16, | "unfinshed"    "dd 09 + "
+"add ","iy",  76,  | 76| 5,9,999,16, | "unfinshed"    "fd 09 + "
 "call","*" ,  77,  | 77| 9,5,204,16, | "cc N N  "
 "jr  ","*" ,  78,  | 78| 9,6,0,16,   | "jr No   "
-"ld  ","b" ,  79,  | 79| 1,2,6,1,    | "ld b,N  "
+"ld  ","b" ,  79,  | 79| 1,2,6,0,    | "ld b,N  "
                    | 80| 2,3,64,1,   | "ld b,r +"
-"ld  ","hl",  81,  | 81| 1,2,33,0,   | "ld hl NN"
-"ld  ","(hl)",82,  | 82| 1,2,54,0    | "ld (hl)N"
-"----","--",  83   |   | =>end<=     |
+"ld  ","c" ,  81,  | 81| 1,2,14,0,   | "ld c,N  "
+                   | 82| 2,3,64,1,   | "ld c,r +"
+"ld  ","d" ,  83,  | 83| 1,2,22,0,   | "ld d,N  "
+                   | 84| 2,3,80,1,   | "ld d,r +"
+"ld  ","e" ,  85,  | 85| 1,2,30,0,   | "ld e,N  "
+                   | 86| 2,3,88,1,   | "ld e,r +"
+"ld  ","h" ,  87,  | 87| 1,2,38,0,   | "ld h,N  "
+                   | 88| 2,3,96,1,   | "ld h,r +"
+"ld  ","l" ,  89,  | 89| 1,2,46,0,   | "ld l,N  "
+                   | 90| 2,3,104,1,  | "ld l,r +"
+"ld  ","a" ,  91,  | 91| 1,2,62,0,   | "ld a,N  "
+                   | 92| 2,3,120,1,  | "ld a,r +"
+"ld  ","bc",  93,  | 93| 1,2,1,1,    | "ld bc,NN"
+"ld  ","de",  94,  | 94| 1,2,17,1,   | "ld de,NN"
+"ld  ","hl",  95,  | 95| 1,2,33,1,   | "ld hl,NN"
+"ld  ","(hl)",96,  | 96| 1,2,54,0    | "ld (hl)N"
+"ld  ","?(@", 97,  | 97| 9,7,34,16   | "ld (@NN)"
+"ex  ","de ", 98,  | 98| 9,8,235,0   | "ex de,hl"
+"----","--",  99   |   | =>end<=     |
 
 *=>match any, 9=>irregular: apply same rule to all arg types
 
